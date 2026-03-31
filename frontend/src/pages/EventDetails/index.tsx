@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useUnit } from 'effector-react';
 import { Link } from 'atomic-router-react';
-import { Button, Typography, Space, Tag, Divider, Row, Col, Card } from 'antd';
+import { Button, Typography, Space, Tag, Divider, Row, Col, Card, Spin } from 'antd';
 import { CalendarOutlined, EnvironmentOutlined, ArrowLeftOutlined, TagOutlined } from '@ant-design/icons';
-import { DUMMY_EVENTS } from '../../services/constants';
 import { routes } from '../../shared/routing';
+import { $events, $isLoading, eventsPageOpened } from '../../entities/events/model';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -12,9 +12,30 @@ const EventDetails: React.FC = () => {
   // Get the ID from the atomic-router route params
   const params = useUnit(routes.eventDetails.$params);
   const id = params?.id;
+  const { events, openPage } = useUnit({
+    events: $events,
+    openPage: eventsPageOpened,
+  });
+  const isLoading = useUnit($isLoading);
+  const [hasRequested, setHasRequested] = useState(() => events.length > 0);
 
-  // Намиране на съответното събитие от масива с dummy данни
-  const event = DUMMY_EVENTS.find((e) => e.id === id);
+  useEffect(() => {
+    setHasRequested(true);
+    if (events.length === 0) {
+      openPage();
+    }
+  }, [events.length, openPage]);
+
+  // Намиране на съответното събитие от масива със Supabase данни
+  const event = events.find((currentEvent) => currentEvent.id === id);
+
+  if (((isLoading || !hasRequested) && events.length === 0)) {
+    return (
+      <div style={{ maxWidth: '1200px', margin: '40px auto', padding: '0 24px', display: 'flex', justifyContent: 'center' }}>
+        <Spin size="large" tip="Зареждане на събитието..." />
+      </div>
+    );
+  }
 
   if (!event) {
     return (
@@ -65,7 +86,7 @@ const EventDetails: React.FC = () => {
             
             <Title level={3} style={{ color: 'var(--text-primary)' }}>Относно събитието</Title>
             <Paragraph style={{ fontSize: '1.1rem', lineHeight: '1.8', color: 'var(--text-secondary)' }}>
-              {event.longDescription || event.description}
+              {event.description}
             </Paragraph>
           </div>
         </Col>

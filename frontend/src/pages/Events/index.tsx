@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
-import { Card, Col, Row, Button, Tag, Typography, Space, Input, Select } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Card, Col, Row, Button, Tag, Typography, Space, Input, Select, Spin } from 'antd';
 import { CalendarOutlined, CloseCircleOutlined, DownCircleOutlined, EnvironmentOutlined, ArrowRightOutlined, SearchOutlined } from '@ant-design/icons';
 import { useUnit } from 'effector-react';
 import { Link } from 'atomic-router-react';
 import { 
+  $events,
   $filteredEvents, 
+  $isLoading,
   $searchText, 
   $selectedCity, 
   $selectedCategory,
   $uniqueCities,
   $uniqueCategories,
+  eventsPageOpened,
   searchChanged,
   cityChanged,
   categoryChanged
@@ -42,6 +45,7 @@ const FilterSelect: React.FC<FilterSelectProps> = ({ placeholder, value, options
         placeholder={placeholder}
         style={{ width: '100%' }}
         size="large"
+        allowClear={false}
         value={value}
         onChange={onChange}
         suffixIcon={
@@ -83,26 +87,38 @@ const FilterSelect: React.FC<FilterSelectProps> = ({ placeholder, value, options
 
 const Events: React.FC = () => {
   const {
+    events,
+    isLoading,
     filteredEvents,
     searchText,
     selectedCity,
     selectedCategory,
     cities,
     categories,
+    openPage,
     onSearch,
     onCityChange,
     onCategoryChange
   } = useUnit({
+    events: $events,
+    isLoading: $isLoading,
     filteredEvents: $filteredEvents,
     searchText: $searchText,
     selectedCity: $selectedCity,
     selectedCategory: $selectedCategory,
     cities: $uniqueCities,
     categories: $uniqueCategories,
+    openPage: eventsPageOpened,
     onSearch: searchChanged,
     onCityChange: cityChanged,
     onCategoryChange: categoryChanged
   });
+  const [hasRequested, setHasRequested] = useState(() => events.length > 0);
+
+  useEffect(() => {
+    setHasRequested(true);
+    openPage();
+  }, [openPage]);
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 24px', color: 'var(--text-primary)' }}>
@@ -144,7 +160,11 @@ const Events: React.FC = () => {
         </Row>
       </Space>
 
-      {filteredEvents.length > 0 ? (
+      {((isLoading || !hasRequested) && events.length === 0) ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '96px 0' }}>
+          <Spin size="large" tip="Зареждане на събития..." />
+        </div>
+      ) : filteredEvents.length > 0 ? (
         <Row gutter={[24, 24]}>
           {filteredEvents.map((event) => (
             <Col xs={24} sm={12} lg={8} key={event.id}>
