@@ -18,8 +18,8 @@ const EventDetails: React.FC = () => {
 
   if (!event) {
     return (
-      <div style={{ maxWidth: '1200px', margin: '40px auto', padding: '0 24px', textAlign: 'center' }}>
-        <Title level={2}>Събитието не е намерено</Title>
+      <div style={{ maxWidth: '1200px', margin: '40px auto', padding: '0 24px', textAlign: 'center', color: 'var(--text-primary)' }}>
+        <Title level={2} style={{ color: 'var(--text-primary)' }}>Събитието не е намерено</Title>
         <Link to={routes.events}>
           <Button type="primary">Назад към списъка</Button>
         </Link>
@@ -28,7 +28,7 @@ const EventDetails: React.FC = () => {
   }
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 24px' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 24px', color: 'var(--text-primary)' }}>
       <Link to={routes.events}>
         <Button 
           icon={<ArrowLeftOutlined />} 
@@ -47,14 +47,14 @@ const EventDetails: React.FC = () => {
             style={{ 
               width: '100%', 
               borderRadius: '12px', 
-              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              boxShadow: 'var(--shadow-soft)',
               maxHeight: '500px',
               objectFit: 'cover'
             }} 
           />
           
           <div style={{ marginTop: '32px' }}>
-            <Title level={1}>{event.title}</Title>
+            <Title level={1} style={{ color: 'var(--text-primary)' }}>{event.title}</Title>
             <Space size={[0, 8]} wrap style={{ marginBottom: '24px' }}>
               <Tag color="blue" icon={<TagOutlined />}>{event.category}</Tag>
               <Tag color="orange" icon={<EnvironmentOutlined />}>{event.city}</Tag>
@@ -63,8 +63,8 @@ const EventDetails: React.FC = () => {
             
             <Divider />
             
-            <Title level={3}>Относно събитието</Title>
-            <Paragraph style={{ fontSize: '1.1rem', lineHeight: '1.8' }}>
+            <Title level={3} style={{ color: 'var(--text-primary)' }}>Относно събитието</Title>
+            <Paragraph style={{ fontSize: '1.1rem', lineHeight: '1.8', color: 'var(--text-secondary)' }}>
               {event.longDescription || event.description}
             </Paragraph>
           </div>
@@ -72,16 +72,16 @@ const EventDetails: React.FC = () => {
 
         {/* Дясна колона: Детайли и CTA */}
         <Col xs={24} lg={8}>
-          <Card bordered={false} style={{ background: '#f9f9f9', position: 'sticky', top: '100px' }}>
-            <Title level={4}>Информация за локация</Title>
+          <Card bordered={false} style={{ background: 'var(--surface-bg)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-soft)', position: 'sticky', top: '100px' }}>
+            <Title level={4} style={{ color: 'var(--text-primary)' }}>Информация за локация</Title>
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               <div>
-                <Text type="secondary" style={{ display: 'block' }}>Дата и час:</Text>
-                <Text strong style={{ fontSize: '1.1rem' }}>{event.date}</Text>
+                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Дата и час:</Text>
+                <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>{event.date}</Text>
               </div>
               <div>
-                <Text type="secondary" style={{ display: 'block' }}>Град:</Text>
-                <Text strong style={{ fontSize: '1.1rem' }}>{event.city}</Text>
+                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Град:</Text>
+                <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>{event.city}</Text>
               </div>
               <Divider />
               <Button type="primary" block size="large">

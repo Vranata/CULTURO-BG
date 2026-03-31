@@ -1,0 +1,65 @@
+.layout {
+  --page-bg: #f0f2f5;
+  --surface-bg: rgba(255, 255, 255, 0.94);
+  --surface-elevated: #ffffff;
+  --text-primary: #10253f;
+  --text-secondary: #5f6b7a;
+  --header-bg: #001529;
+  --header-text: #ffffff;
+  --footer-bg: #001529;
+  --footer-text: rgba(255, 255, 255, 0.65);
+  --border-color: rgba(15, 23, 42, 0.08);
+  --shadow-soft: 0 16px 40px rgba(15, 23, 42, 0.08);
+  --hero-bg: linear-gradient(135deg, #1d6fff 0%, #36a2ff 100%);
+  --hero-text: #ffffff;
+  --hero-button-bg: #ffffff;
+  --hero-button-text: #1890ff;
+  --accent: #1890ff;
+  --toggle-bg: rgba(255, 255, 255, 0.12);
+  --toggle-fg: #ffffff;
+  --toggle-border: rgba(255, 255, 255, 0.18);
+}
+
+.layout[data-theme='dark'] {
+  --page-bg: #0b1220;
+  --surface-bg: rgba(16, 26, 46, 0.96);
+  --surface-elevated: #111c31;
+  --text-primary: #eef5ff;
+  --text-secondary: #9fb0c3;
+  --header-bg: #09101c;
+  --header-text: #ffffff;
+  --footer-bg: #09101c;
+  --footer-text: rgba(255, 255, 255, 0.65);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --shadow-soft: 0 18px 42px rgba(0, 0, 0, 0.34);
+  --hero-bg: linear-gradient(135deg, #173b6c 0%, #0f2b52 100%);
+  --hero-text: #ffffff;
+  --hero-button-bg: #ffffff;
+  --hero-button-text: #0b1220;
+  --accent: #5aa7ff;
+  --toggle-bg: rgba(255, 255, 255, 0.12);
+  --toggle-fg: #ffffff;
+  --toggle-border: rgba(255, 255, 255, 0.18);
+}
+
+.layout[data-theme='orange'] {
+  --page-bg: linear-gradient(180deg, #fffaf4 0%, #ffffff 55%, #fff7ef 100%);
+  --surface-bg: rgba(255, 255, 255, 0.95);
+  --surface-elevated: #ffffff;
+  --text-primary: #5a2b00;
+  --text-secondary: #8b5a36;
+  --header-bg: rgba(255, 250, 244, 0.96);
+  --header-text: #5a2b00;
+  --footer-bg: #fffaf4;
+  --footer-text: #5a2b00;
+  --border-color: rgba(198, 90, 0, 0.12);
+  --shadow-soft: 0 18px 40px rgba(198, 90, 0, 0.08);
+  --hero-bg: linear-gradient(135deg, #fff7ef 0%, #ffe8d4 100%);
+  --hero-text: #5a2b00;
+  --hero-button-bg: #c65a00;
+  --hero-button-text: #ffffff;
+  --accent: #c65a00;
+  --toggle-bg: #fff3e8;
+  --toggle-fg: #c65a00;
+  --toggle-border: #f0d2b3;
+}
