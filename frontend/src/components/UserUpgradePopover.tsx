@@ -71,7 +71,7 @@ const UserUpgradePopover: React.FC<{ user: AppUser }> = ({ user }) => {
   const handleSubmit = async (values: UpgradeRequestValues) => {
     const specialtyLabel = specialtyOptions.find((option) => option.value === values.specialtyCategoryId)?.label ?? values.specialtyCategoryId;
     const mailBody = [
-      'Заявка за ъпгрейд към Special User',
+      'Заявка за Special User',
       '',
       `Име: ${values.applicantName}`,
       `Имейл: ${values.applicantEmail}`,
@@ -158,10 +158,10 @@ const UserUpgradePopover: React.FC<{ user: AppUser }> = ({ user }) => {
   const content = (
     <div style={{ maxWidth: 260 }}>
       <Typography.Title level={5} style={{ marginBottom: 8, color: 'var(--text-primary)' }}>
-        ъпгрейд към Special User
+        Стани Special User
       </Typography.Title>
       <Typography.Paragraph style={{ marginBottom: 12, color: 'var(--text-secondary)' }}>
-        Изпрати кратка заявка и тя ще бъде подготвена за администратора.
+        Изпрати кратка заявка и тя ще бъде прегледана от администратора.
       </Typography.Paragraph>
       <Button type="primary" block onClick={handleOpenModal}>
         Upgrade to Special User
