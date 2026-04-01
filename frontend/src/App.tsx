@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Route, Link } from 'atomic-router-react';
+import { useUnit } from 'effector-react';
 import { Button, ConfigProvider, Layout, Menu, Tooltip, theme as antdTheme } from 'antd';
-import { BgColorsOutlined, CalendarOutlined, HomeOutlined, LoginOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons';
+import { BgColorsOutlined, CalendarOutlined, HomeOutlined, LoginOutlined, LogoutOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons';
 import { history, routes } from './shared/routing';
+import { $isAuthenticated, $user, signOutFx } from './entities/model';
 import './theme.css';
 
 import Home from './pages/Home/index';
@@ -67,35 +69,37 @@ const AppMenu: React.FC<{ themeMode: ThemeMode }> = ({ themeMode }) => {
     };
   }, []);
 
+  const items = [
+    {
+      key: 'home',
+      icon: <HomeOutlined />,
+      label: <Link to={routes.home}>Начало</Link>,
+    },
+    {
+      key: 'events',
+      icon: <CalendarOutlined />,
+      label: <Link to={routes.events}>Събития</Link>,
+    },
+  ];
+
   return (
     <Menu
       theme={themeMode === 'orange' ? 'light' : 'dark'}
       mode="horizontal"
       selectedKeys={[selectedKey]}
       style={{ flex: 1, minWidth: 0, borderBottom: 'none', background: 'transparent' }}
-      items={[
-        {
-          key: 'home',
-          icon: <HomeOutlined />,
-          label: <Link to={routes.home}>Начало</Link>,
-        },
-        {
-          key: 'events',
-          icon: <CalendarOutlined />,
-          label: <Link to={routes.events}>Събития</Link>,
-        },
-        {
-          key: 'login',
-          icon: <LoginOutlined />,
-          label: <Link to={routes.login}>Вход</Link>,
-        },
-      ]}
+      items={items}
     />
   );
 };
 
 const App: React.FC = () => {
   const [themeMode, setThemeMode] = useState<ThemeMode>('light');
+  const { isAuthenticated, signOut, user } = useUnit({
+    isAuthenticated: $isAuthenticated,
+    user: $user,
+    signOut: signOutFx,
+  });
 
   const themeConfig = useMemo(() => getThemeConfig(themeMode), [themeMode]);
 
@@ -140,6 +144,68 @@ const App: React.FC = () => {
           </div>
 
           <AppMenu themeMode={themeMode} />
+
+          {isAuthenticated && user?.email && (
+            <Tooltip title={user.email}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  maxWidth: 200,
+                  height: 34,
+                  marginLeft: 12,
+                  padding: '0 12px',
+                  borderRadius: 999,
+                  border: '1px solid var(--toggle-border)',
+                  background: 'var(--toggle-bg)',
+                  color: 'var(--header-text)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {user.email}
+              </span>
+            </Tooltip>
+          )}
+
+          {isAuthenticated ? (
+            <Tooltip title="Изход">
+              <Button
+                shape="circle"
+                type="text"
+                onClick={() => signOut()}
+                icon={<LogoutOutlined />}
+                style={{
+                  width: 34,
+                  height: 34,
+                  marginLeft: 12,
+                  color: 'var(--toggle-fg)',
+                  background: 'var(--toggle-bg)',
+                  border: '1px solid var(--toggle-border)',
+                }}
+              />
+            </Tooltip>
+          ) : (
+            <Tooltip title="Вход">
+              <Link to={routes.login} style={{ display: 'inline-flex', marginLeft: 12 }}>
+                <Button
+                  shape="circle"
+                  type="text"
+                  icon={<LoginOutlined />}
+                  style={{
+                    width: 34,
+                    height: 34,
+                    color: 'var(--toggle-fg)',
+                    background: 'var(--toggle-bg)',
+                    border: '1px solid var(--toggle-border)',
+                  }}
+                />
+              </Link>
+            </Tooltip>
+          )}
 
           <Tooltip title={themeTooltip}>
             <Button
