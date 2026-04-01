@@ -5,6 +5,7 @@ import { Button, ConfigProvider, Layout, Menu, Tooltip, theme as antdTheme } fro
 import { BgColorsOutlined, CalendarOutlined, HomeOutlined, LoginOutlined, LogoutOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons';
 import { history, routes } from './shared/routing';
 import { $isAuthenticated, $user, signOutFx } from './entities/model';
+import UserUpgradePopover from './components/UserUpgradePopover';
 import './theme.css';
 
 import Home from './pages/Home/index';
@@ -145,51 +146,7 @@ const App: React.FC = () => {
 
           <AppMenu themeMode={themeMode} />
 
-          {isAuthenticated && user?.email && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 12 }}>
-              <Tooltip title={user.email}>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    maxWidth: 200,
-                    height: 34,
-                    padding: '0 12px',
-                    borderRadius: 999,
-                    border: '1px solid var(--toggle-border)',
-                    background: 'var(--toggle-bg)',
-                    color: 'var(--header-text)',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {user.email}
-                </span>
-              </Tooltip>
-              <Tooltip title={user.roleNote}>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    height: 34,
-                    padding: '0 12px',
-                    borderRadius: 999,
-                    border: '1px solid var(--toggle-border)',
-                    background: 'var(--toggle-bg)',
-                    color: 'var(--header-text)',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {user.roleName}
-                </span>
-              </Tooltip>
-            </div>
-          )}
+          {isAuthenticated && user && <UserUpgradePopover user={user} />}
 
           {isAuthenticated ? (
             <Tooltip title="Изход">

@@ -53,14 +53,16 @@ const roleFallbacks: Record<UserRole, { note: string }> = {
   },
 };
 
+const adminBootstrapEmail = 'culturobg@gmail.com';
+
 const buildFallbackUser = (session: Session): AppUser => ({
   id: session.user.id,
   authUserId: session.user.id,
   email: session.user.email ?? '',
   name: session.user.user_metadata?.full_name ?? session.user.user_metadata?.name ?? session.user.email ?? 'Потребител',
-  roleId: 1,
-  roleName: 'User',
-  roleNote: roleFallbacks.User.note,
+  roleId: session.user.email?.toLowerCase() === adminBootstrapEmail ? 3 : 1,
+  roleName: session.user.email?.toLowerCase() === adminBootstrapEmail ? 'Administrator' : 'User',
+  roleNote: session.user.email?.toLowerCase() === adminBootstrapEmail ? roleFallbacks.Administrator.note : roleFallbacks.User.note,
   picture: null,
   regionId: null,
   phone: null,
