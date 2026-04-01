@@ -1,9 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { LockOutlined, MailOutlined, UserAddOutlined } from '@ant-design/icons';
 import { Button, Card, Form, Input, Space, Typography, message } from 'antd';
 import { useUnit } from 'effector-react';
-import { history } from '../../shared/routing';
-import { $isAuthenticated, signInFx, signUpFx } from '../../entities/model';
+import { signInFx, signUpFx } from '../../entities/model';
 
 type LoginFormValues = {
   email: string;
@@ -16,24 +15,16 @@ const Login: React.FC = () => {
   const [form] = Form.useForm<LoginFormValues>();
 
   const {
-    isAuthenticated,
     signIn,
     signUp,
     isSigningIn,
     isSigningUp,
   } = useUnit({
-    isAuthenticated: $isAuthenticated,
     signIn: signInFx,
     signUp: signUpFx,
     isSigningIn: signInFx.pending,
     isSigningUp: signUpFx.pending,
   });
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      history.replace('/');
-    }
-  }, [isAuthenticated]);
 
   const handleSignIn = async (values: LoginFormValues) => {
     try {

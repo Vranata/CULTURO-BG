@@ -1,6 +1,6 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { redirect } from 'atomic-router';
-import { combine, createEffect, createEvent, createStore, sample } from 'effector';
+import { createEffect, createEvent, createStore, sample } from 'effector';
 import { routes } from '../shared/routing';
 import { getSession, signIn, signOut, signUp, type AuthCredentials } from '../shared/api/auth';
 
@@ -43,8 +43,22 @@ sample({
 });
 
 sample({
-  clock: $isAuthenticated.updates,
-  filter: (isAuthenticated: boolean) => isAuthenticated,
+  clock: checkSessionFx.doneData,
+  filter: (session: Session | null): session is Session => Boolean(session),
+  fn: () => undefined,
+  target: goHome,
+});
+
+sample({
+  clock: signInFx.doneData,
+  filter: (session: Session | null): session is Session => Boolean(session),
+  fn: () => undefined,
+  target: goHome,
+});
+
+sample({
+  clock: signUpFx.doneData,
+  filter: (session: Session | null): session is Session => Boolean(session),
   fn: () => undefined,
   target: goHome,
 });
