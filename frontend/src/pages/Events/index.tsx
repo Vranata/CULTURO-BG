@@ -4,11 +4,14 @@ import { Button, Card, Col, DatePicker, Input, message, Popconfirm, Row, Select,
 import { ArrowRightOutlined, CalendarOutlined, CloseCircleOutlined, DeleteOutlined, DownCircleOutlined, EditOutlined, EnvironmentOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useUnit } from 'effector-react';
 import { Link } from 'atomic-router-react';
+import EventLikeButton from '../../components/EventLikeButton';
 import EventEditorModal from '../../components/EventEditorModal';
 import {
   $categoryOptions,
   $events,
   $isLoading,
+  clearLikedEventIds,
+  fetchLikedEventIdsFx,
   $regionOptions,
   $searchText,
   $selectedCategoryId,
@@ -178,6 +181,35 @@ const Events: React.FC = () => {
 
     return data.id_user;
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncLikedEvents = async () => {
+      if (!user) {
+        clearLikedEventIds();
+        return;
+      }
+
+      try {
+        const currentUserDbId = await resolveCurrentUserDbId();
+
+        if (!cancelled) {
+          await fetchLikedEventIdsFx(String(currentUserDbId));
+        }
+      } catch {
+        if (!cancelled) {
+          clearLikedEventIds();
+        }
+      }
+    };
+
+    void syncLikedEvents();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.authUserId]);
 
   useEffect(() => {
     setHasRequested(true);
@@ -365,6 +397,8 @@ const Events: React.FC = () => {
                     <Link to={routes.eventDetails} params={{ id: event.id }}>
                       <Button type="default" icon={<ArrowRightOutlined />}>Виж повече</Button>
                     </Link>
+
+                    <EventLikeButton eventId={event.id} compact />
 
                     {canManageEvent ? (
                       <>

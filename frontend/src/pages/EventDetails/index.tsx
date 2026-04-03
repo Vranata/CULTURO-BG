@@ -3,8 +3,10 @@ import { useUnit } from 'effector-react';
 import { Link } from 'atomic-router-react';
 import { Button, Typography, Space, Tag, Divider, Row, Col, Card, Spin } from 'antd';
 import { CalendarOutlined, EnvironmentOutlined, ArrowLeftOutlined, TagOutlined } from '@ant-design/icons';
+import EventLikeButton from '../../components/EventLikeButton';
 import { routes } from '../../shared/routing';
-import { $currentEvent, $isDetailLoading, eventDetailsOpened } from '../../entities/events/model';
+import { $currentEvent, $isDetailLoading, clearLikedEventIds, eventDetailsOpened, fetchLikedEventIdsFx } from '../../entities/events/model';
+import { $user } from '../../entities/model';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -17,6 +19,7 @@ const EventDetails: React.FC = () => {
     openEvent: eventDetailsOpened,
     isLoading: $isDetailLoading,
   });
+  const user = useUnit($user);
 
   const [hasRequested, setHasRequested] = useState(() => currentEvent !== null);
 
@@ -28,6 +31,40 @@ const EventDetails: React.FC = () => {
     setHasRequested(true);
     openEvent(eventId);
   }, [eventId, openEvent]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncLikedEvents = async () => {
+      if (!user) {
+        clearLikedEventIds();
+        return;
+      }
+
+      const numericUserId = Number(user.id);
+
+      if (Number.isNaN(numericUserId)) {
+        clearLikedEventIds();
+        return;
+      }
+
+      try {
+        if (!cancelled) {
+          await fetchLikedEventIdsFx(String(numericUserId));
+        }
+      } catch {
+        if (!cancelled) {
+          clearLikedEventIds();
+        }
+      }
+    };
+
+    void syncLikedEvents();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   if (((isLoading || !hasRequested) && !currentEvent)) {
     return (
@@ -126,10 +163,7 @@ const EventDetails: React.FC = () => {
                 <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Край:</Text>
                 <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>{currentEvent.endDate} {currentEvent.endHour}</Text>
               </div>
-              <div>
-                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Снимка:</Text>
-                <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)', wordBreak: 'break-word' }}>{currentEvent.image}</Text>
-              </div>
+              <EventLikeButton eventId={currentEvent.id} block />
               <Divider />
               <Button type="primary" block size="large">
                 Запиши се / Билети

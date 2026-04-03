@@ -38,6 +38,11 @@ export type EventMutationValues = EventEditorValues & {
   userId: string;
 };
 
+export type EventLikeMutation = {
+  userId: string;
+  eventId: string;
+};
+
 export type FilterOption = {
   label: string;
   value: string;
@@ -76,6 +81,11 @@ type RegionRow = {
 type CategoryRow = {
   id_event_category: number;
   name_event_category: string;
+};
+
+type EventLikeRow = {
+  id_user: number;
+  id_event: number;
 };
 
 const fallbackImage = 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80';
@@ -177,8 +187,77 @@ const loadEventRowById = async (eventId: string): Promise<EventItem | null> => {
   return row ? mapEventRow(row) : null;
 };
 
+const loadLikedEventIds = async (userId: string): Promise<string[]> => {
+  const numericUserId = Number(userId);
+
+  if (Number.isNaN(numericUserId)) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('event_likes')
+    .select('id_user, id_event')
+    .eq('id_user', numericUserId)
+    .order('id_event', { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as EventLikeRow[]).map((row) => String(row.id_event));
+};
+
+const toggleEventLike = async ({ userId, eventId }: EventLikeMutation): Promise<{ eventId: string; liked: boolean }> => {
+  const numericUserId = Number(userId);
+  const numericEventId = Number(eventId);
+
+  if (Number.isNaN(numericUserId) || Number.isNaN(numericEventId)) {
+    throw new Error('Invalid like payload.');
+  }
+
+  const { data: existingLike, error: fetchError } = await supabase
+    .from('event_likes')
+    .select('id_event')
+    .eq('id_user', numericUserId)
+    .eq('id_event', numericEventId)
+    .maybeSingle();
+
+  if (fetchError) {
+    throw fetchError;
+  }
+
+  if (existingLike) {
+    const { error: deleteError } = await supabase
+      .from('event_likes')
+      .delete()
+      .eq('id_user', numericUserId)
+      .eq('id_event', numericEventId);
+
+    if (deleteError) {
+      throw deleteError;
+    }
+
+    return { eventId, liked: false };
+  }
+
+  const { error: insertError } = await supabase
+    .from('event_likes')
+    .insert({
+      id_user: numericUserId,
+      id_event: numericEventId,
+    });
+
+  if (insertError) {
+    throw insertError;
+  }
+
+  return { eventId, liked: true };
+};
+
 export const fetchEventsFx = createEffect(loadEventRows);
 export const fetchEventByIdFx = createEffect(loadEventRowById);
+export const fetchLikedEventIdsFx = createEffect(loadLikedEventIds);
+export const toggleEventLikeFx = createEffect(toggleEventLike);
 export const addEventFx = createEffect(async (values: EventMutationValues): Promise<EventItem> => {
   const { data, error } = await supabase
     .from('events')
@@ -281,6 +360,7 @@ export const searchChanged = createEvent<string>();
 export const regionChanged = createEvent<string | null>();
 export const categoryChanged = createEvent<string | null>();
 export const dateChanged = createEvent<string | null>();
+export const clearLikedEventIds = createEvent<void>();
 
 export const $events = createStore<EventItem[]>([])
   .on(fetchEventsFx.doneData, (_, nextEvents) => sortEvents(nextEvents))
@@ -291,6 +371,14 @@ export const $currentEvent = createStore<EventItem | null>(null)
   .on(fetchEventByIdFx.doneData, (_, nextEvent) => nextEvent)
   .on(updateEventFx.doneData, (currentEvent, nextEvent) => (currentEvent?.id === nextEvent.id ? nextEvent : currentEvent))
   .on(deleteEventFx.doneData, (currentEvent, deletedEventId) => (currentEvent?.id === deletedEventId ? null : currentEvent));
+export const $likedEventIds = createStore<string[]>([])
+  .on(fetchLikedEventIdsFx.doneData, (_, nextLikedEventIds) => nextLikedEventIds)
+  .on(toggleEventLikeFx.doneData, (likedEventIds, { eventId, liked }) => (
+    liked
+      ? Array.from(new Set([...likedEventIds, eventId]))
+      : likedEventIds.filter((likedEventId) => likedEventId !== eventId)
+  ))
+  .reset(clearLikedEventIds);
 
 export const $isLoading = combine({
   events: fetchEventsFx.pending,
