@@ -12,7 +12,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from functools import lru_cache
 from typing import Any
 from urllib.parse import urljoin, urlparse
@@ -1346,6 +1346,108 @@ def event_value(event: dict[str, Any], key: str, default: Any = "") -> Any:
     return value
 
 
+def normalize_event_text(value: Any) -> str:
+    return clean_text(str(value)) if value is not None else ""
+
+
+def parse_event_date(value: Any) -> date | None:
+    cleaned_value = normalize_event_text(value)
+    if not cleaned_value:
+        return None
+
+    try:
+        return date.fromisoformat(cleaned_value)
+    except ValueError:
+        return None
+
+
+def is_placeholder_time(value: Any) -> bool:
+    return normalize_event_text(value) in {"", "00:00", "00:00:00"}
+
+
+def programata_events_share_identity(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    return all(
+        normalize_event_text(event_value(left, key)) == normalize_event_text(event_value(right, key))
+        for key in ("name_event", "name_artist", "place_event", "id_event_category", "id_user", "id_region")
+    )
+
+
+def programata_events_overlap(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    left_start = parse_event_date(event_value(left, "start_date"))
+    left_end = parse_event_date(event_value(left, "end_date"))
+    right_start = parse_event_date(event_value(right, "start_date"))
+    right_end = parse_event_date(event_value(right, "end_date"))
+
+    if left_start is None or left_end is None or right_start is None or right_end is None:
+        return False
+
+    return left_start <= right_end and right_start <= left_end
+
+
+def programata_events_time_compatible(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    left_start_hour = normalize_event_text(event_value(left, "start_hour"))
+    left_end_hour = normalize_event_text(event_value(left, "end_hour"))
+    right_start_hour = normalize_event_text(event_value(right, "start_hour"))
+    right_end_hour = normalize_event_text(event_value(right, "end_hour"))
+
+    if left_start_hour == right_start_hour and left_end_hour == right_end_hour:
+        return True
+
+    return (
+        is_placeholder_time(left_start_hour)
+        or is_placeholder_time(left_end_hour)
+        or is_placeholder_time(right_start_hour)
+        or is_placeholder_time(right_end_hour)
+    )
+
+
+def programata_events_can_merge(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    return (
+        programata_events_share_identity(left, right)
+        and programata_events_overlap(left, right)
+        and programata_events_time_compatible(left, right)
+    )
+
+
+def merge_programata_event_payload(base_payload: dict[str, Any], matching_events: list[dict[str, Any]]) -> dict[str, Any]:
+    merged_payload = dict(base_payload)
+
+    start_dates = [parse_event_date(merged_payload.get("start_date"))]
+    start_dates.extend(parse_event_date(event.get("start_date")) for event in matching_events)
+    valid_start_dates = [value for value in start_dates if value is not None]
+    if valid_start_dates:
+        merged_payload["start_date"] = min(valid_start_dates).isoformat()
+
+    end_dates = [parse_event_date(merged_payload.get("end_date"))]
+    end_dates.extend(parse_event_date(event.get("end_date")) for event in matching_events)
+    valid_end_dates = [value for value in end_dates if value is not None]
+    if valid_end_dates:
+        merged_payload["end_date"] = max(valid_end_dates).isoformat()
+
+    start_hours = [normalize_event_text(merged_payload.get("start_hour"))]
+    start_hours.extend(normalize_event_text(event.get("start_hour")) for event in matching_events)
+    merged_start_hour = next((value for value in start_hours if not is_placeholder_time(value)), start_hours[0])
+    merged_payload["start_hour"] = merged_start_hour
+
+    end_hours = [normalize_event_text(merged_payload.get("end_hour"))]
+    end_hours.extend(normalize_event_text(event.get("end_hour")) for event in matching_events)
+    merged_end_hour = next((value for value in end_hours if not is_placeholder_time(value)), end_hours[0])
+    merged_payload["end_hour"] = merged_end_hour
+
+    descriptions = [normalize_event_text(merged_payload.get("description"))]
+    descriptions.extend(normalize_event_text(event.get("description")) for event in matching_events)
+    merged_description = max((text for text in descriptions if text), key=len, default="")
+    if merged_description:
+        merged_payload["description"] = merged_description
+
+    pictures = [normalize_event_text(merged_payload.get("picture"))]
+    pictures.extend(normalize_event_text(event.get("picture")) for event in matching_events)
+    merged_picture = next((text for text in pictures if text), "")
+    merged_payload["picture"] = merged_picture or None
+
+    return merged_payload
+
+
 def build_event_payload(event: dict[str, Any]) -> dict[str, Any]:
     return {key: event_value(event, key) for key in EVENT_PAYLOAD_KEYS}
 
@@ -1412,40 +1514,72 @@ def verify_supabase_connection(client: Client) -> None:
         raise RuntimeError(f"Could not connect to Supabase: {exc}") from exc
 
 
-def find_existing_event_id(client: Client, event: dict[str, Any]) -> int | None:
+def find_existing_event_matches(client: Client, event: dict[str, Any]) -> list[dict[str, Any]]:
+    start_date = event_value(event, "start_date")
+    end_date = event_value(event, "end_date")
+
+    if not start_date or not end_date:
+        return []
+
     query = (
         client.table("events")
-        .select("id_event")
+        .select("id_event, start_date, start_hour, end_date, end_hour, description, picture")
         .eq("name_event", event_value(event, "name_event"))
         .eq("name_artist", event_value(event, "name_artist"))
         .eq("place_event", event_value(event, "place_event"))
         .eq("id_event_category", event_value(event, "id_event_category"))
         .eq("id_user", event_value(event, "id_user"))
         .eq("id_region", event_value(event, "id_region"))
-        .eq("start_date", event_value(event, "start_date"))
-        .eq("start_hour", event_value(event, "start_hour"))
-        .eq("end_date", event_value(event, "end_date"))
-        .eq("end_hour", event_value(event, "end_hour"))
-        .limit(1)
+        .lte("start_date", end_date)
+        .gte("end_date", start_date)
     )
     response = query.execute()
     rows = response.data or []
-    if not rows:
-        return None
-    return int(rows[0]["id_event"])
+    return [row for row in rows if programata_events_time_compatible(row, event)]
+
+
+def choose_canonical_event_match(matches: list[dict[str, Any]]) -> dict[str, Any]:
+    return min(
+        matches,
+        key=lambda row: (
+            parse_event_date(row.get("start_date")) or date.max,
+            parse_event_date(row.get("end_date")) or date.max,
+            int(row.get("id_event") or 0),
+        ),
+    )
 
 
 def upsert_event(client: Client, event: dict[str, Any]) -> dict[str, Any]:
     payload = build_event_payload(event)
-    existing_id = find_existing_event_id(client, event)
+    matching_events = find_existing_event_matches(client, event)
 
     try:
-        if existing_id is None:
+        if not matching_events:
             response = client.table("events").insert(payload).execute()
             logger.info("Inserted event: %s", event_value(event, "name_event"))
         else:
-            response = client.table("events").update(payload).eq("id_event", existing_id).execute()
-            logger.info("Updated event %s: %s", existing_id, event_value(event, "name_event"))
+            canonical_event = choose_canonical_event_match(matching_events)
+            merged_payload = merge_programata_event_payload(payload, matching_events)
+            canonical_event_id = int(canonical_event["id_event"])
+            response = client.table("events").update(merged_payload).eq("id_event", canonical_event_id).execute()
+
+            duplicate_event_ids = [int(row["id_event"]) for row in matching_events if int(row["id_event"]) != canonical_event_id]
+            if duplicate_event_ids:
+                likes_response = client.table("event_likes").select("id_user").in_("id_event", duplicate_event_ids).execute()
+                likes_rows = likes_response.data or []
+                if likes_rows:
+                    transferred_likes = [
+                        {
+                            "id_user": int(row["id_user"]),
+                            "id_event": canonical_event_id,
+                        }
+                        for row in likes_rows
+                    ]
+                    client.table("event_likes").upsert(transferred_likes, on_conflict="id_user,id_event").execute()
+
+                client.table("events").delete().in_("id_event", duplicate_event_ids).execute()
+
+            logger.info("Updated event %s: %s", canonical_event_id, event_value(event, "name_event"))
     except Exception as exc:  # supabase-py raises multiple exception types depending on the failure.
         logger.error("Failed to upsert event '%s': %s", event_value(event, "name_event"), exc)
         raise
