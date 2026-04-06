@@ -75,6 +75,16 @@ PROGRAMATA_CATEGORY_SYNONYMS = {
 
 PROGRAMATA_DEFAULT_CATEGORY_NAME = "Фестивали"
 PROGRAMATA_DEFAULT_REGION_NAME = "Непосочен регион"
+PROGRAMATA_DEFAULT_SOURCE_URL = "https://programata.bg/"
+
+PROGRAMATA_PATH_CATEGORY_HINTS = [
+    ("/kino/", "Кино"),
+    ("/muzika/", "Концерти"),
+    ("/stsena/", "Театър"),
+    ("/izlozhbi/", "Фестивали"),
+    ("/literatura/", "Фестивали"),
+    ("/gradat/", "Фестивали"),
+]
 
 EVENT_PAYLOAD_KEYS = [
     "name_event",
@@ -351,10 +361,21 @@ def parse_programata_schedule_line(value: str, year_hint: int | None = None) -> 
     }
 
 
-def infer_programata_category_name(source_url: str | None, page_text: str, breadcrumb_text: str = "") -> str:
-    combined_text = " ".join(part for part in [source_url or "", page_text, breadcrumb_text] if part).casefold()
+def infer_programata_category_name(
+    source_url: str | None,
+    page_text: str,
+    breadcrumb_text: str = "",
+    section_title: str = "",
+    card_title: str = "",
+) -> str:
+    url_path = urlparse(source_url or "").path.casefold()
+    for path_fragment, category_name in PROGRAMATA_PATH_CATEGORY_HINTS:
+        if path_fragment in url_path:
+            return category_name
 
-    if "kino" in combined_text:
+    combined_text = " ".join(part for part in [page_text, breadcrumb_text, section_title, card_title] if part).casefold()
+
+    if "kino" in combined_text or "филм" in combined_text:
         return "Кино"
     if "сцен" in combined_text or "теат" in combined_text:
         return "Театър"
@@ -375,8 +396,10 @@ def resolve_programata_category_id(
     source_url: str | None,
     page_text: str,
     breadcrumb_text: str = "",
+    section_title: str = "",
+    card_title: str = "",
 ) -> int:
-    category_name = infer_programata_category_name(source_url, page_text, breadcrumb_text)
+    category_name = infer_programata_category_name(source_url, page_text, breadcrumb_text, section_title, card_title)
     try:
         return resolve_lookup_id(category_name, category_lookup, "event category")
     except ValueError:
@@ -456,7 +479,7 @@ def extract_article_metadata(
 
     container = extract_article_container(soup)
     page_text = clean_text(container.get_text(" ", strip=True))
-    category_id = resolve_programata_category_id(category_lookup, source_url, page_text, breadcrumb_text)
+    category_id = resolve_programata_category_id(category_lookup, source_url, page_text, breadcrumb_text, card_title=card_title)
     region_id = resolve_programata_region_id(region_lookup, page_text, breadcrumb_text)
     user_id = default_user_id if default_user_id is not None else 1
 
@@ -525,6 +548,7 @@ def build_programata_event_dict(
     block: dict[str, Any],
     metadata: dict[str, Any],
     base_url: str,
+    category_lookup: dict[str, int],
 ) -> dict[str, Any]:
     description_parts = [clean_text(part) for part in block.get("description_parts", []) if clean_text(part)]
     schedule: dict[str, str] = {}
@@ -563,11 +587,20 @@ def build_programata_event_dict(
     if not combined_description:
         combined_description = metadata.get("description", "")
 
+    block_category_id = resolve_programata_category_id(
+        category_lookup,
+        base_url,
+        metadata.get("page_text", ""),
+        metadata.get("breadcrumb_text", ""),
+        block.get("section", ""),
+        block.get("title", ""),
+    )
+
     event_dict = {
         "name_event": block.get("title") or metadata.get("page_title") or metadata.get("card_title") or "",
         "name_artist": metadata.get("author") or "Програмата",
         "place_event": schedule.get("place_event", ""),
-        "id_event_category": metadata["id_event_category"],
+        "id_event_category": block_category_id,
         "id_user": metadata["id_user"],
         "id_region": metadata["id_region"],
         "start_date": schedule["start_date"],
@@ -604,8 +637,8 @@ def parse_event_card(
     card_image = extract_card_image(card, source_url)
 
     if not detail_url:
-        fallback_category_name = infer_programata_category_name(None, card_title)
-        fallback_category_id = resolve_programata_category_id(category_lookup, None, card_title)
+        fallback_category_name = infer_programata_category_name(None, card_title, card_title=card_title)
+        fallback_category_id = resolve_programata_category_id(category_lookup, None, card_title, card_title=card_title)
         fallback_region_id = resolve_programata_region_id(region_lookup, card_title)
         start_date = datetime.now().date().isoformat()
         fallback_event = {
@@ -631,7 +664,7 @@ def parse_event_card(
         html = fetch_html(detail_url)
     except RequestException as exc:
         logger.warning("Falling back to card-only parsing for %s: %s", detail_url, exc)
-        fallback_category_id = resolve_programata_category_id(category_lookup, detail_url, card_title)
+        fallback_category_id = resolve_programata_category_id(category_lookup, detail_url, card_title, card_title=card_title)
         fallback_region_id = resolve_programata_region_id(region_lookup, card_title)
         start_date = datetime.now().date().isoformat()
         return [
@@ -698,7 +731,7 @@ def parse_event_card(
     seen_keys: set[tuple[Any, ...]] = set()
 
     for block in blocks:
-        event_dict = build_programata_event_dict(block, metadata, detail_url)
+        event_dict = build_programata_event_dict(block, metadata, detail_url, category_lookup)
         dedupe_key = (
             event_dict["name_event"],
             event_dict["name_artist"],
@@ -853,7 +886,11 @@ def upsert_event(client: Client, event: dict[str, Any]) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Scrape events and save them to Supabase.")
-    parser.add_argument("--url", default=os.environ.get("SCRAPER_SOURCE_URL"), help="Events page URL")
+    parser.add_argument(
+        "--url",
+        default=os.environ.get("SCRAPER_SOURCE_URL") or PROGRAMATA_DEFAULT_SOURCE_URL,
+        help="Events page URL (defaults to Programata.bg homepage)",
+    )
     parser.add_argument(
         "--default-user-id",
         type=int,
@@ -861,9 +898,6 @@ def main() -> int:
         help="Fallback id_user for imported events",
     )
     args = parser.parse_args()
-
-    if not args.url:
-        raise RuntimeError("Provide --url or set SCRAPER_SOURCE_URL.")
 
     try:
         client = create_supabase_client()
