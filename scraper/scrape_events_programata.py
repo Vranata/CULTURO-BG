@@ -58,6 +58,8 @@ MONTHS_BG = {
     "декември": 12,
 }
 
+BULGARIAN_MONTH_PATTERN = r"(?:януари|февруари|март|април|май|юни|юли|август|септември|октомври|ноември|декември)"
+
 PROGRAMATA_CATEGORY_SYNONYMS = {
     "кино": "Кино",
     "сцена": "Театър",
@@ -86,16 +88,6 @@ PROGRAMATA_PATH_CATEGORY_HINTS = [
     ("/gradat/", "Фестивали"),
 ]
 
-PROGRAMATA_SOFIA_VENUE_HINTS = [
-    "кино одеон",
-    "дом на киното",
-    "народен театър",
-    "национален дворец на културата",
-    "ндк",
-    "сфумато",
-    "театър софия",
-]
-
 EVENT_PAYLOAD_KEYS = [
     "name_event",
     "name_artist",
@@ -118,6 +110,31 @@ SCHEDULE_LINE_RE = re.compile(
 
 DATE_RANGE_RE = re.compile(
     r"(?P<start_day>\d{1,2})(?:\s*[-–]\s*(?P<end_day>\d{1,2}))?\s+(?P<month>[А-Яа-я]+)(?:\s+(?P<year>\d{4}))?",
+    re.IGNORECASE,
+)
+
+NUMERIC_SCHEDULE_RE = re.compile(
+    r'''(?P<start_date>\d{2}\.\d{2}\.\d{4})(?:\s*\([^)]+\))?\s*[–-]\s*(?P<time>\d{1,2}:\d{2})(?:\s*ч\.?)?\s*[–-]\s*(?P<city>[А-ЯA-ZА-Яа-яЁё„“"'\-\. ]{2,60}?),\s*(?P<place>.+?)(?=(?:\s+\d{2}\.\d{2}\.\d{4})|$)''',
+    re.IGNORECASE,
+)
+
+CITY_MONTH_RANGE_RE = re.compile(
+    rf'''(?P<city>[А-ЯA-ZА-Яа-яЁё„“"'\-\. ]{{2,60}}?)\s+(?P<start_day>\d{{1,2}})\s+(?P<start_month>{BULGARIAN_MONTH_PATTERN})\s+(?P<start_year>\d{{4}})\s*[–-]\s*(?P<end_day>\d{{1,2}})\s+(?P<end_month>{BULGARIAN_MONTH_PATTERN})\s+(?P<end_year>\d{{4}})(?:\s*[–-]\s*(?P<place>.+?))?(?=(?:\s+[А-ЯA-ZА-Яа-яЁё]{{2,}}|\s*$))''',
+    re.IGNORECASE,
+)
+
+CITY_MONTH_TIME_RE = re.compile(
+    rf'''(?P<city>[А-ЯA-ZА-Яа-яЁё„“"'\-\. ]{{2,60}}?)\s+(?P<day>\d{{1,2}})\s+(?P<month>{BULGARIAN_MONTH_PATTERN})(?:\s+(?P<year>\d{{4}}))?(?:,\s*(?P<time>\d{{1,2}}:\d{{2}})(?:\s*ч\.?)?)?\s*[–-]\s*(?P<place>.+?)(?=(?:\s+[А-ЯA-ZА-Яа-яЁё]{{2,}}|\s*$))''',
+    re.IGNORECASE,
+)
+
+DATE_RANGE_TEXT_RE = re.compile(
+    rf"(?P<start_day>\d{{1,2}})\s*(?:и|[-–])\s*(?P<end_day>\d{{1,2}})\s+(?P<month>{BULGARIAN_MONTH_PATTERN})(?:\s+(?P<year>\d{{4}}))?(?:\s*(?:в|на)\s+(?P<place>.+?))?(?=(?:\s+[А-ЯA-ZА-Яа-яЁё]{{2,}}|\s*$))",
+    re.IGNORECASE,
+)
+
+SIMPLE_DATE_TEXT_RE = re.compile(
+    rf"(?:на\s+)?(?P<day>\d{{1,2}})\s+(?P<month>{BULGARIAN_MONTH_PATTERN})(?:\s+(?P<year>\d{{4}}))?(?:,\s*(?P<time>\d{{1,2}}:\d{{2}})(?:\s*ч\.?)?)?(?:\s*(?:в|на)\s+(?P<place>.+?))?(?=(?:\s+[А-ЯA-ZА-Яа-яЁё]{{2,}}|\s*$))",
     re.IGNORECASE,
 )
 
@@ -315,6 +332,21 @@ def extract_card_image(card: Tag, base_url: str | None = None) -> str:
     return urljoin(base_url or "", src)
 
 
+def extract_programata_content_text(container: Tag | BeautifulSoup) -> str:
+    content_parts: list[str] = []
+    for element in container.find_all(["h2", "h3", "h4", "h5", "p"], recursive=True):
+        text = clean_text(element.get_text(" ", strip=True))
+        if not text:
+            continue
+
+        if text.casefold() in STOP_SECTION_TITLES:
+            break
+
+        content_parts.append(text)
+
+    return clean_text(" ".join(content_parts))
+
+
 def strip_trailing_year(value: str) -> str:
     cleaned_value = clean_text(value).strip('"“”')
     cleaned_value = re.sub(r"\s*[-–]\s*\d{4}$", "", cleaned_value)
@@ -371,6 +403,106 @@ def parse_programata_schedule_line(value: str, year_hint: int | None = None) -> 
     }
 
 
+def parse_programata_heading_schedule_line(value: str, year_hint: int | None = None) -> dict[str, str]:
+    cleaned_value = clean_text(value)
+    if not cleaned_value:
+        raise ValueError("Missing schedule value")
+
+    numeric_match = NUMERIC_SCHEDULE_RE.fullmatch(cleaned_value)
+    if numeric_match is not None:
+        place_value = clean_text(numeric_match.group("place"))
+        city_value = clean_text(numeric_match.group("city"))
+        if city_value and place_value.lower().startswith(city_value.lower() + ","):
+            place_value = clean_text(place_value[len(city_value):].lstrip(", "))
+
+        return {
+            "start_date": parse_date_value(numeric_match.group("start_date")),
+            "start_hour": parse_time_value(numeric_match.group("time")),
+            "end_date": parse_date_value(numeric_match.group("start_date")),
+            "end_hour": parse_time_value(numeric_match.group("time")),
+            "place_event": place_value,
+            "region_hint": city_value,
+        }
+
+    city_month_time_match = CITY_MONTH_TIME_RE.fullmatch(cleaned_value)
+    if city_month_time_match is not None:
+        year_value = int(city_month_time_match.group("year") or year_hint or datetime.now().year)
+        month_value = parse_bulgarian_month(city_month_time_match.group("month"))
+        day_value = int(city_month_time_match.group("day"))
+        start_date = datetime(year_value, month_value, day_value).date().isoformat()
+        start_hour = parse_time_value(city_month_time_match.group("time") or "00:00")
+        place_value = clean_text(city_month_time_match.group("place"))
+        return {
+            "start_date": start_date,
+            "start_hour": start_hour,
+            "end_date": start_date,
+            "end_hour": start_hour,
+            "place_event": place_value,
+            "region_hint": clean_text(city_month_time_match.group("city")),
+        }
+
+    city_month_range_match = CITY_MONTH_RANGE_RE.fullmatch(cleaned_value)
+    if city_month_range_match is not None:
+        start_date = datetime(
+            int(city_month_range_match.group("start_year") or year_hint or datetime.now().year),
+            parse_bulgarian_month(city_month_range_match.group("start_month")),
+            int(city_month_range_match.group("start_day")),
+        ).date().isoformat()
+        end_date = datetime(
+            int(city_month_range_match.group("end_year") or year_hint or datetime.now().year),
+            parse_bulgarian_month(city_month_range_match.group("end_month")),
+            int(city_month_range_match.group("end_day")),
+        ).date().isoformat()
+        return {
+            "start_date": start_date,
+            "start_hour": "00:00:00",
+            "end_date": end_date,
+            "end_hour": "00:00:00",
+            "place_event": clean_text(city_month_range_match.group("place")),
+            "region_hint": clean_text(city_month_range_match.group("city")),
+        }
+
+    date_range_text_match = DATE_RANGE_TEXT_RE.fullmatch(cleaned_value)
+    if date_range_text_match is not None:
+        start_date = datetime(
+            int(date_range_text_match.group("year") or year_hint or datetime.now().year),
+            parse_bulgarian_month(date_range_text_match.group("month")),
+            int(date_range_text_match.group("start_day")),
+        ).date().isoformat()
+        end_date = datetime(
+            int(date_range_text_match.group("year") or year_hint or datetime.now().year),
+            parse_bulgarian_month(date_range_text_match.group("month")),
+            int(date_range_text_match.group("end_day")),
+        ).date().isoformat()
+        return {
+            "start_date": start_date,
+            "start_hour": "00:00:00",
+            "end_date": end_date,
+            "end_hour": "00:00:00",
+            "place_event": clean_text(date_range_text_match.group("place")),
+            "region_hint": "",
+        }
+
+    simple_date_text_match = SIMPLE_DATE_TEXT_RE.fullmatch(cleaned_value)
+    if simple_date_text_match is not None:
+        year_value = int(simple_date_text_match.group("year") or year_hint or datetime.now().year)
+        month_value = parse_bulgarian_month(simple_date_text_match.group("month"))
+        day_value = int(simple_date_text_match.group("day"))
+        start_date = datetime(year_value, month_value, day_value).date().isoformat()
+        start_hour = parse_time_value(simple_date_text_match.group("time") or "00:00")
+        place_value = clean_text(simple_date_text_match.group("place"))
+        return {
+            "start_date": start_date,
+            "start_hour": start_hour,
+            "end_date": start_date,
+            "end_hour": start_hour,
+            "place_event": place_value,
+            "region_hint": "",
+        }
+
+    return parse_programata_schedule_line(cleaned_value, year_hint)
+
+
 def infer_programata_category_name(
     source_url: str | None,
     page_text: str,
@@ -420,35 +552,39 @@ def resolve_programata_category_id(
 
 
 def resolve_programata_region_id(region_lookup: dict[str, int], page_text: str, place_text: str = "") -> int:
-    combined_text = normalize_lookup_key(" ".join(part for part in [page_text, place_text] if part))
-    sofia_region_id = (
-        region_lookup.get(normalize_lookup_key("София-град"))
-        or region_lookup.get(normalize_lookup_key("София град"))
-        or region_lookup.get(normalize_lookup_key("София"))
+    place_text_value = normalize_lookup_key(place_text)
+    page_text_value = normalize_lookup_key(page_text)
+    fallback_region_id = (
+        region_lookup.get(normalize_lookup_key(PROGRAMATA_DEFAULT_REGION_NAME))
+        or region_lookup.get(0)
+        or 0
     )
-    fallback_region_id = sofia_region_id or region_lookup.get(normalize_lookup_key(PROGRAMATA_DEFAULT_REGION_NAME))
-    if fallback_region_id is None and region_lookup:
-        fallback_region_id = next(iter(region_lookup.values()))
-    if fallback_region_id is None:
-        fallback_region_id = 23
 
-    if not combined_text:
+    if not place_text_value and not page_text_value:
         return fallback_region_id
 
-    if "софия" in combined_text:
-        if sofia_region_id is not None:
-            return sofia_region_id
-
-    if any(venue_hint in combined_text for venue_hint in PROGRAMATA_SOFIA_VENUE_HINTS):
-        if sofia_region_id is not None:
-            return sofia_region_id
-
     ordered_regions = sorted(region_lookup.items(), key=lambda item: len(item[0]), reverse=True)
+
     for region_name, region_id in ordered_regions:
         if region_name == normalize_lookup_key(PROGRAMATA_DEFAULT_REGION_NAME):
             continue
-        if region_name and region_name in combined_text:
+        if region_name and region_name in place_text_value:
             return region_id
+
+    for region_name, region_id in ordered_regions:
+        if region_name == normalize_lookup_key(PROGRAMATA_DEFAULT_REGION_NAME):
+            continue
+        if region_name and region_name in page_text_value:
+            return region_id
+
+    if "софия" in place_text_value or "софия" in page_text_value:
+        sofia_region_id = (
+            region_lookup.get(normalize_lookup_key("София-град"))
+            or region_lookup.get(normalize_lookup_key("София град"))
+            or region_lookup.get(normalize_lookup_key("София"))
+        )
+        if sofia_region_id is not None:
+            return sofia_region_id
 
     return fallback_region_id
 
@@ -499,7 +635,7 @@ def extract_article_metadata(
     description_value = first_meta_content(soup, DETAIL_META_DESCRIPTION_SELECTORS)
 
     container = extract_article_container(soup)
-    page_text = clean_text(container.get_text(" ", strip=True))
+    page_text = extract_programata_content_text(container)
     category_id = resolve_programata_category_id(category_lookup, source_url, page_text, breadcrumb_text, card_title=card_title)
     region_id = resolve_programata_region_id(region_lookup, page_text, breadcrumb_text)
     user_id = default_user_id if default_user_id is not None else 1
@@ -557,7 +693,7 @@ def collect_programata_blocks(container: Tag | BeautifulSoup, base_url: str) -> 
             blocks.append(current_block)
             continue
 
-        if element.name == "p":
+        if element.name in {"h4", "h5", "p"}:
             if current_block is None:
                 continue
             current_block["description_parts"].append(text)
@@ -570,27 +706,12 @@ def build_programata_event_dict(
     metadata: dict[str, Any],
     base_url: str,
     category_lookup: dict[str, int],
-) -> dict[str, Any] | None:
+) -> list[dict[str, Any]] | None:
     description_parts = [clean_text(part) for part in block.get("description_parts", []) if clean_text(part)]
-    schedule: dict[str, str] = {}
-    remaining_description = description_parts[:]
-
-    if remaining_description:
-        first_line = remaining_description[0]
-        try:
-            schedule = parse_programata_schedule_line(first_line, metadata.get("year_hint"))
-            remaining_description = remaining_description[1:]
-        except ValueError:
-            return None
-
-    if not schedule:
+    if not description_parts:
         return None
 
     block_url = urljoin(base_url, block.get("url", "")) if block.get("url") else base_url
-    combined_description = clean_text(" ".join(remaining_description))
-    if not combined_description:
-        combined_description = metadata.get("description", "")
-
     block_category_id = resolve_programata_category_id(
         category_lookup,
         base_url,
@@ -600,32 +721,286 @@ def build_programata_event_dict(
         block.get("title", ""),
     )
 
+    intro_parts: list[str] = []
+    current_schedule: dict[str, Any] | None = None
+    current_description_parts: list[str] = []
+    events: list[dict[str, Any]] = []
+
+    def finalize_event(schedule: dict[str, str], description_chunks: list[str]) -> None:
+        combined_description = clean_text(" ".join(description_chunks))
+        if not combined_description:
+            combined_description = metadata.get("description", "")
+
+        event_dict = {
+            "name_event": block.get("title") or metadata.get("page_title") or metadata.get("card_title") or "",
+            "name_artist": metadata.get("author") or "Програмата",
+            "place_event": schedule.get("place_event", ""),
+            "id_event_category": block_category_id,
+            "id_user": metadata["id_user"],
+            "id_region": metadata["id_region"],
+            "start_date": schedule["start_date"],
+            "start_hour": schedule["start_hour"],
+            "end_date": schedule["end_date"],
+            "end_hour": schedule["end_hour"],
+            "picture": metadata.get("picture"),
+            "description": combined_description,
+            "source_url": block_url,
+            "section_title": block.get("section", ""),
+            "card_title": metadata.get("card_title", ""),
+        }
+
+        if not event_dict["place_event"]:
+            event_dict["place_event"] = schedule.get("place_event", "")
+
+        event_dict["name_event"] = clean_text(strip_trailing_year(event_dict["name_event"]))
+        event_dict["description"] = clean_text(event_dict["description"])
+        event_dict["picture"] = clean_text(event_dict["picture"]) or None
+        events.append(event_dict)
+
+    for part in description_parts:
+        try:
+            schedule = parse_programata_schedule_line(part, metadata.get("year_hint"))
+        except ValueError:
+            if current_schedule is None:
+                intro_parts.append(part)
+            else:
+                current_description_parts.append(part)
+            continue
+
+        if current_schedule is not None:
+            finalize_event(current_schedule, current_description_parts)
+
+        current_schedule = schedule
+        current_description_parts = intro_parts[:]
+
+    if current_schedule is None:
+        return None
+
+    finalize_event(current_schedule, current_description_parts)
+    return events
+
+
+def build_programata_event_from_schedule(
+    metadata: dict[str, Any],
+    detail_url: str,
+    category_lookup: dict[str, int],
+    region_lookup: dict[str, int],
+    schedule: dict[str, str],
+    place_event: str = "",
+    section_title: str = "",
+    title_override: str | None = None,
+) -> dict[str, Any]:
+    event_name = clean_text(title_override or metadata.get("page_title") or metadata.get("card_title") or "")
+    description_value = clean_text(metadata.get("description", "") or metadata.get("page_text", ""))
+    place_value = clean_text(place_event or schedule.get("place_event", ""))
+    region_hint_value = clean_text(schedule.get("region_hint", ""))
+    region_lookup_text = " ".join(part for part in [region_hint_value, place_value] if part)
+
     event_dict = {
-        "name_event": block.get("title") or metadata.get("page_title") or metadata.get("card_title") or "",
+        "name_event": clean_text(strip_trailing_year(event_name)),
         "name_artist": metadata.get("author") or "Програмата",
-        "place_event": schedule.get("place_event", ""),
-        "id_event_category": block_category_id,
+        "place_event": place_value,
+        "id_event_category": resolve_programata_category_id(
+            category_lookup,
+            detail_url,
+            metadata.get("page_text", ""),
+            metadata.get("breadcrumb_text", ""),
+            section_title,
+            event_name,
+        ),
         "id_user": metadata["id_user"],
-        "id_region": metadata["id_region"],
+        "id_region": resolve_programata_region_id(region_lookup, description_value, region_lookup_text),
         "start_date": schedule["start_date"],
         "start_hour": schedule["start_hour"],
         "end_date": schedule["end_date"],
         "end_hour": schedule["end_hour"],
         "picture": metadata.get("picture"),
-        "description": combined_description,
-        "source_url": block_url,
-        "section_title": block.get("section", ""),
+        "description": description_value,
+        "source_url": detail_url,
+        "section_title": section_title or metadata.get("breadcrumb_text", ""),
         "card_title": metadata.get("card_title", ""),
     }
 
-    if not event_dict["place_event"]:
-        event_dict["place_event"] = schedule.get("place_event", "")
-
-    event_dict["name_event"] = clean_text(strip_trailing_year(event_dict["name_event"]))
-    event_dict["description"] = clean_text(event_dict["description"])
     event_dict["picture"] = clean_text(event_dict["picture"]) or None
-
     return event_dict
+
+
+def extract_programata_events_from_page_text(
+    metadata: dict[str, Any],
+    detail_url: str,
+    category_lookup: dict[str, int],
+    region_lookup: dict[str, int],
+) -> list[dict[str, Any]]:
+    page_text = metadata.get("page_text", "")
+    candidate_events: list[dict[str, Any]] = []
+    seen_keys: set[tuple[Any, ...]] = set()
+
+    def append_event(schedule: dict[str, str], place_event: str = "", section_title: str = "", title_override: str | None = None) -> None:
+        event_dict = build_programata_event_from_schedule(
+            metadata,
+            detail_url,
+            category_lookup,
+            region_lookup,
+            schedule,
+            place_event=place_event,
+            section_title=section_title,
+            title_override=title_override,
+        )
+        dedupe_key = (
+            event_dict["name_event"],
+            event_dict["name_artist"],
+            event_dict["place_event"],
+            event_dict["id_event_category"],
+            event_dict["id_user"],
+            event_dict["id_region"],
+            event_dict["start_date"],
+            event_dict["start_hour"],
+            event_dict["end_date"],
+            event_dict["end_hour"],
+        )
+        if dedupe_key in seen_keys:
+            return
+        seen_keys.add(dedupe_key)
+        candidate_events.append(event_dict)
+
+    for match in NUMERIC_SCHEDULE_RE.finditer(page_text):
+        schedule = {
+            "start_date": parse_date_value(match.group("start_date")),
+            "start_hour": parse_time_value(match.group("time")),
+            "end_date": parse_date_value(match.group("start_date")),
+            "end_hour": parse_time_value(match.group("time")),
+            "place_event": clean_text(match.group("place")),
+        }
+        city_value = clean_text(match.group("city"))
+        place_value = schedule["place_event"]
+        if city_value and place_value.lower().startswith(city_value.lower() + ","):
+            schedule["place_event"] = clean_text(place_value[len(city_value):].lstrip(", "))
+        append_event(schedule, place_event=schedule["place_event"])
+
+    for match in CITY_MONTH_RANGE_RE.finditer(page_text):
+        schedule = {
+            "start_date": parse_bulgarian_date_range(
+                f"{match.group('start_day')} {match.group('start_month')} {match.group('start_year')}",
+                metadata.get("year_hint"),
+            )[0],
+            "start_hour": "00:00:00",
+            "end_date": parse_bulgarian_date_range(
+                f"{match.group('end_day')} {match.group('end_month')} {match.group('end_year')}",
+                metadata.get("year_hint"),
+            )[0],
+            "end_hour": "00:00:00",
+            "place_event": clean_text(match.group("place")),
+        }
+        append_event(schedule, place_event=schedule["place_event"], section_title=clean_text(match.group("city")))
+
+    for match in CITY_MONTH_TIME_RE.finditer(page_text):
+        schedule = {
+            "start_date": parse_bulgarian_date_range(
+                f"{match.group('day')} {match.group('month')} {match.group('year') or metadata.get('year_hint')}",
+                metadata.get("year_hint"),
+            )[0],
+            "start_hour": parse_time_value(match.group("time") or "00:00"),
+            "end_date": parse_bulgarian_date_range(
+                f"{match.group('day')} {match.group('month')} {match.group('year') or metadata.get('year_hint')}",
+                metadata.get("year_hint"),
+            )[1],
+            "end_hour": parse_time_value(match.group("time") or "00:00"),
+            "place_event": clean_text(match.group("place")),
+        }
+        append_event(schedule, place_event=schedule["place_event"], section_title=clean_text(match.group("city")))
+
+    for match in DATE_RANGE_TEXT_RE.finditer(page_text):
+        schedule = {
+            "start_date": parse_bulgarian_date_range(
+                f"{match.group('start_day')} {match.group('month')} {match.group('year') or metadata.get('year_hint')}",
+                metadata.get("year_hint"),
+            )[0],
+            "start_hour": "00:00:00",
+            "end_date": parse_bulgarian_date_range(
+                f"{match.group('end_day')} {match.group('month')} {match.group('year') or metadata.get('year_hint')}",
+                metadata.get("year_hint"),
+            )[0],
+            "end_hour": "00:00:00",
+            "place_event": clean_text(match.group("place")),
+        }
+        append_event(schedule, place_event=schedule["place_event"])
+
+    for match in SIMPLE_DATE_TEXT_RE.finditer(page_text):
+        schedule = {
+            "start_date": parse_bulgarian_date_range(
+                f"{match.group('day')} {match.group('month')} {match.group('year') or metadata.get('year_hint')}",
+                metadata.get("year_hint"),
+            )[0],
+            "start_hour": parse_time_value(match.group("time") or "00:00"),
+            "end_date": parse_bulgarian_date_range(
+                f"{match.group('day')} {match.group('month')} {match.group('year') or metadata.get('year_hint')}",
+                metadata.get("year_hint"),
+            )[1],
+            "end_hour": parse_time_value(match.group("time") or "00:00"),
+            "place_event": clean_text(match.group("place")),
+        }
+        append_event(schedule, place_event=schedule["place_event"])
+
+    return candidate_events
+
+
+def extract_programata_events_from_heading_schedule(
+    container: Tag | BeautifulSoup,
+    metadata: dict[str, Any],
+    detail_url: str,
+    category_lookup: dict[str, int],
+    region_lookup: dict[str, int],
+) -> list[dict[str, Any]]:
+    page_title = clean_text(metadata.get("page_title") or metadata.get("card_title") or "")
+    intro_parts: list[str] = []
+    current_schedule: dict[str, str] | None = None
+    current_description_parts: list[str] = []
+    events: list[dict[str, Any]] = []
+
+    def finalize_event(schedule: dict[str, str], description_chunks: list[str]) -> None:
+        event_dict = build_programata_event_from_schedule(
+            metadata,
+            detail_url,
+            category_lookup,
+            region_lookup,
+            schedule,
+            place_event=schedule.get("place_event", ""),
+            section_title=metadata.get("breadcrumb_text", ""),
+            title_override=page_title,
+        )
+        if description_chunks:
+            event_dict["description"] = clean_text(" ".join(description_chunks)) or event_dict["description"]
+        events.append(event_dict)
+
+    for element in container.find_all(["h4", "h5", "p"], recursive=True):
+        text = clean_text(element.get_text(" ", strip=True))
+        if not text:
+            continue
+
+        lowered = text.casefold()
+        if lowered in STOP_SECTION_TITLES:
+            break
+
+        try:
+            schedule = parse_programata_heading_schedule_line(text, metadata.get("year_hint"))
+        except ValueError:
+            if current_schedule is None:
+                intro_parts.append(text)
+            else:
+                current_description_parts.append(text)
+            continue
+
+        if current_schedule is not None:
+            finalize_event(current_schedule, current_description_parts)
+
+        current_schedule = schedule
+        current_description_parts = intro_parts[:]
+
+    if current_schedule is None:
+        return []
+
+    finalize_event(current_schedule, current_description_parts)
+    return events
 
 
 def is_event_in_past(event: dict[str, Any]) -> bool:
@@ -683,7 +1058,26 @@ def parse_event_card(
         try:
             schedule = parse_programata_schedule_line(page_title, metadata.get("year_hint"))
         except ValueError:
-            return []
+            schedule = None
+
+        if schedule is None:
+            heading_events = extract_programata_events_from_heading_schedule(
+                container,
+                metadata,
+                detail_url,
+                category_lookup,
+                region_lookup,
+            )
+            if heading_events:
+                return [event for event in heading_events if not is_event_in_past(event)]
+
+            fallback_events = extract_programata_events_from_page_text(
+                metadata,
+                detail_url,
+                category_lookup,
+                region_lookup,
+            )
+            return [event for event in fallback_events if not is_event_in_past(event)]
 
         fallback_event = {
             "name_event": strip_trailing_year(page_title),
@@ -704,37 +1098,47 @@ def parse_event_card(
         }
 
         if is_event_in_past(fallback_event):
-          return []
+                        return []
         return [fallback_event]
 
     events: list[dict[str, Any]] = []
     seen_keys: set[tuple[Any, ...]] = set()
 
     for block in blocks:
-        event_dict = build_programata_event_dict(block, metadata, detail_url, category_lookup)
-        if event_dict is None:
+        block_events = build_programata_event_dict(block, metadata, detail_url, category_lookup)
+        if not block_events:
             continue
-        if is_event_in_past(event_dict):
-            logger.info("Skipping past event: %s", event_value(event_dict, "name_event"))
-            continue
-        dedupe_key = (
-            event_dict["name_event"],
-            event_dict["name_artist"],
-            event_dict["place_event"],
-            event_dict["id_event_category"],
-            event_dict["id_user"],
-            event_dict["id_region"],
-            event_dict["start_date"],
-            event_dict["start_hour"],
-            event_dict["end_date"],
-            event_dict["end_hour"],
-        )
-        if dedupe_key in seen_keys:
-            continue
-        seen_keys.add(dedupe_key)
-        events.append(event_dict)
+        for event_dict in block_events:
+            if is_event_in_past(event_dict):
+                logger.info("Skipping past event: %s", event_value(event_dict, "name_event"))
+                continue
+            dedupe_key = (
+                event_dict["name_event"],
+                event_dict["name_artist"],
+                event_dict["place_event"],
+                event_dict["id_event_category"],
+                event_dict["id_user"],
+                event_dict["id_region"],
+                event_dict["start_date"],
+                event_dict["start_hour"],
+                event_dict["end_date"],
+                event_dict["end_hour"],
+            )
+            if dedupe_key in seen_keys:
+                continue
+            seen_keys.add(dedupe_key)
+            events.append(event_dict)
 
-    return events
+    if events:
+        return events
+
+    fallback_events = extract_programata_events_from_page_text(
+        metadata,
+        detail_url,
+        category_lookup,
+        region_lookup,
+    )
+    return [event for event in fallback_events if not is_event_in_past(event)]
 
 
 def parse_events(
