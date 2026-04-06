@@ -86,6 +86,16 @@ PROGRAMATA_PATH_CATEGORY_HINTS = [
     ("/gradat/", "Фестивали"),
 ]
 
+PROGRAMATA_SOFIA_VENUE_HINTS = [
+    "кино одеон",
+    "дом на киното",
+    "народен театър",
+    "национален дворец на културата",
+    "ндк",
+    "сфумато",
+    "театър софия",
+]
+
 EVENT_PAYLOAD_KEYS = [
     "name_event",
     "name_artist",
@@ -411,16 +421,27 @@ def resolve_programata_category_id(
 
 def resolve_programata_region_id(region_lookup: dict[str, int], page_text: str, place_text: str = "") -> int:
     combined_text = normalize_lookup_key(" ".join(part for part in [page_text, place_text] if part))
+    sofia_region_id = (
+        region_lookup.get(normalize_lookup_key("София-град"))
+        or region_lookup.get(normalize_lookup_key("София град"))
+        or region_lookup.get(normalize_lookup_key("София"))
+    )
+    fallback_region_id = sofia_region_id or region_lookup.get(normalize_lookup_key(PROGRAMATA_DEFAULT_REGION_NAME))
+    if fallback_region_id is None and region_lookup:
+        fallback_region_id = next(iter(region_lookup.values()))
+    if fallback_region_id is None:
+        fallback_region_id = 23
 
     if not combined_text:
-        fallback_key = normalize_lookup_key(PROGRAMATA_DEFAULT_REGION_NAME)
-        return region_lookup.get(fallback_key, 0)
+        return fallback_region_id
 
     if "софия" in combined_text:
-        for candidate in ("софия-град", "софия град", "софия"):
-            candidate_key = normalize_lookup_key(candidate)
-            if candidate_key in region_lookup:
-                return region_lookup[candidate_key]
+        if sofia_region_id is not None:
+            return sofia_region_id
+
+    if any(venue_hint in combined_text for venue_hint in PROGRAMATA_SOFIA_VENUE_HINTS):
+        if sofia_region_id is not None:
+            return sofia_region_id
 
     ordered_regions = sorted(region_lookup.items(), key=lambda item: len(item[0]), reverse=True)
     for region_name, region_id in ordered_regions:
@@ -429,7 +450,7 @@ def resolve_programata_region_id(region_lookup: dict[str, int], page_text: str, 
         if region_name and region_name in combined_text:
             return region_id
 
-    return region_lookup.get(normalize_lookup_key(PROGRAMATA_DEFAULT_REGION_NAME), 0)
+    return fallback_region_id
 
 
 def extract_article_container(soup: BeautifulSoup) -> Tag | BeautifulSoup:
@@ -549,7 +570,7 @@ def build_programata_event_dict(
     metadata: dict[str, Any],
     base_url: str,
     category_lookup: dict[str, int],
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     description_parts = [clean_text(part) for part in block.get("description_parts", []) if clean_text(part)]
     schedule: dict[str, str] = {}
     remaining_description = description_parts[:]
@@ -560,27 +581,10 @@ def build_programata_event_dict(
             schedule = parse_programata_schedule_line(first_line, metadata.get("year_hint"))
             remaining_description = remaining_description[1:]
         except ValueError:
-            schedule = {}
+            return None
 
     if not schedule:
-        try:
-            start_date, end_date = parse_bulgarian_date_range(metadata.get("page_title", ""), metadata.get("year_hint"))
-        except ValueError:
-            if metadata.get("published_date"):
-                start_date = metadata["published_date"]
-                end_date = metadata["published_date"]
-            else:
-                today_value = datetime.now().date().isoformat()
-                start_date = today_value
-                end_date = today_value
-
-        schedule = {
-            "start_date": start_date,
-            "end_date": end_date,
-            "start_hour": metadata.get("published_time", "00:00:00") or "00:00:00",
-            "end_hour": metadata.get("published_time", "00:00:00") or "00:00:00",
-            "place_event": "",
-        }
+        return None
 
     block_url = urljoin(base_url, block.get("url", "")) if block.get("url") else base_url
     combined_description = clean_text(" ".join(remaining_description))
@@ -624,6 +628,21 @@ def build_programata_event_dict(
     return event_dict
 
 
+def is_event_in_past(event: dict[str, Any]) -> bool:
+    start_date = event_value(event, "start_date")
+    start_hour = event_value(event, "start_hour")
+
+    if not start_date or not start_hour:
+        return True
+
+    try:
+        start_datetime = datetime.strptime(f"{start_date} {start_hour}", "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return True
+
+    return start_datetime < datetime.now()
+
+
 def parse_event_card(
     card: Tag,
     region_lookup: dict[str, int],
@@ -637,55 +656,14 @@ def parse_event_card(
     card_image = extract_card_image(card, source_url)
 
     if not detail_url:
-        fallback_category_name = infer_programata_category_name(None, card_title, card_title=card_title)
-        fallback_category_id = resolve_programata_category_id(category_lookup, None, card_title, card_title=card_title)
-        fallback_region_id = resolve_programata_region_id(region_lookup, card_title)
-        start_date = datetime.now().date().isoformat()
-        fallback_event = {
-            "name_event": strip_trailing_year(card_title),
-            "name_artist": card_author or "Програмата",
-            "place_event": "",
-            "id_event_category": fallback_category_id,
-            "id_user": default_user_id if default_user_id is not None else 1,
-            "id_region": fallback_region_id,
-            "start_date": start_date,
-            "start_hour": "00:00:00",
-            "end_date": start_date,
-            "end_hour": "00:00:00",
-            "picture": card_image or None,
-            "description": "",
-            "source_url": "",
-            "section_title": fallback_category_name,
-            "card_title": card_title,
-        }
-        return [fallback_event]
+        logger.warning("Skipping card without detail URL: %s", card_title)
+        return []
 
     try:
         html = fetch_html(detail_url)
     except RequestException as exc:
         logger.warning("Falling back to card-only parsing for %s: %s", detail_url, exc)
-        fallback_category_id = resolve_programata_category_id(category_lookup, detail_url, card_title, card_title=card_title)
-        fallback_region_id = resolve_programata_region_id(region_lookup, card_title)
-        start_date = datetime.now().date().isoformat()
-        return [
-            {
-                "name_event": strip_trailing_year(card_title),
-                "name_artist": card_author or "Програмата",
-                "place_event": "",
-                "id_event_category": fallback_category_id,
-                "id_user": default_user_id if default_user_id is not None else 1,
-                "id_region": fallback_region_id,
-                "start_date": start_date,
-                "start_hour": "00:00:00",
-                "end_date": start_date,
-                "end_hour": "00:00:00",
-                "picture": card_image or None,
-                "description": "",
-                "source_url": detail_url,
-                "section_title": "",
-                "card_title": card_title,
-            }
-        ]
+        return []
 
     soup = BeautifulSoup(html, "html.parser")
     metadata = extract_article_metadata(
@@ -703,10 +681,9 @@ def parse_event_card(
     if not blocks:
         page_title = metadata.get("page_title") or card_title
         try:
-            start_date, end_date = parse_bulgarian_date_range(page_title, metadata.get("year_hint"))
+            schedule = parse_programata_schedule_line(page_title, metadata.get("year_hint"))
         except ValueError:
-            start_date = metadata.get("published_date") or datetime.now().date().isoformat()
-            end_date = start_date
+            return []
 
         fallback_event = {
             "name_event": strip_trailing_year(page_title),
@@ -715,16 +692,19 @@ def parse_event_card(
             "id_event_category": metadata["id_event_category"],
             "id_user": metadata["id_user"],
             "id_region": metadata["id_region"],
-            "start_date": start_date,
-            "start_hour": metadata.get("published_time", "00:00:00"),
-            "end_date": end_date,
-            "end_hour": metadata.get("published_time", "00:00:00"),
+            "start_date": schedule["start_date"],
+            "start_hour": schedule["start_hour"],
+            "end_date": schedule["end_date"],
+            "end_hour": schedule["end_hour"],
             "picture": metadata.get("picture") or card_image or None,
             "description": metadata.get("description", ""),
             "source_url": detail_url,
             "section_title": metadata.get("breadcrumb_text", ""),
             "card_title": card_title,
         }
+
+        if is_event_in_past(fallback_event):
+          return []
         return [fallback_event]
 
     events: list[dict[str, Any]] = []
@@ -732,6 +712,11 @@ def parse_event_card(
 
     for block in blocks:
         event_dict = build_programata_event_dict(block, metadata, detail_url, category_lookup)
+        if event_dict is None:
+            continue
+        if is_event_in_past(event_dict):
+            logger.info("Skipping past event: %s", event_value(event_dict, "name_event"))
+            continue
         dedupe_key = (
             event_dict["name_event"],
             event_dict["name_artist"],
@@ -771,6 +756,8 @@ def parse_events(
         try:
             parsed_events = parse_event_card(card, region_lookup, category_lookup, default_user_id, source_url)
             for event in parsed_events:
+                if is_event_in_past(event):
+                    continue
                 dedupe_key = (
                     event["name_event"],
                     event["name_artist"],
