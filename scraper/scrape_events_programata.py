@@ -147,6 +147,34 @@ SIMPLE_DATE_TEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
+PROGRAMATA_LINE_SCHEDULE_RE = re.compile(
+    rf"^(?P<start_day>\d{{1,2}})(?:\s*[-–]\s*(?P<end_day>\d{{1,2}}))?\s+(?P<month>{BULGARIAN_MONTH_PATTERN})(?:\s+(?P<year>\d{{4}}))?(?:\s*[,:\-–]\s*(?P<time>\d{{1,2}}:\d{{2}})(?:\s*ч\.?)?)?(?:\s*(?:\((?P<paren_place>.+?)\)|,\s*(?P<place>.+)))?$",
+    re.IGNORECASE,
+)
+
+PROGRAMATA_DATE_ONLY_LINE_RE = re.compile(
+    rf"^(?P<start_day>\d{{1,2}})(?:\s*[-–]\s*(?P<end_day>\d{{1,2}}))?\s+(?P<month>{BULGARIAN_MONTH_PATTERN})(?:\s+(?P<year>\d{{4}}))?:?$",
+    re.IGNORECASE,
+)
+
+PROGRAMATA_TIME_ONLY_LINE_RE = re.compile(
+    r"^(?P<time>\d{1,2}:\d{2})(?:\s*ч\.?)?(?:\s*\((?P<place>.+?)\))?$",
+    re.IGNORECASE,
+)
+
+PROGRAMATA_IGNORED_CONTEXT_LINES = {
+    "Начало",
+    "Сцена",
+    "Постановки",
+    "Опера, Балет, Танц",
+    "Опера и оперета",
+    "Кино",
+    "Музика",
+    "Изложби",
+    "Литература",
+    "Градът",
+}
+
 
 @dataclass(slots=True)
 class EventRecord:
@@ -422,6 +450,15 @@ def load_lookup_maps(client: Client) -> tuple[dict[str, int], dict[str, int]]:
     return region_map, category_map
 
 
+def load_existing_programata_events(client: Client) -> list[dict[str, Any]]:
+    response = (
+        client.table("events")
+        .select("id_event, name_event, name_artist, place_event, id_event_category, id_user, id_region, start_date, start_hour, end_date, end_hour, description, picture")
+        .execute()
+    )
+    return response.data or []
+
+
 def first_match_text(root: Tag | BeautifulSoup, selectors: list[str], attribute: str | None = None) -> str:
     for selector in selectors:
         element = root.select_one(selector)
@@ -460,8 +497,8 @@ def extract_card_image(card: Tag, base_url: str | None = None) -> str:
 
 def extract_programata_content_text(container: Tag | BeautifulSoup) -> str:
     content_parts: list[str] = []
-    for element in container.find_all(["h2", "h3", "h4", "h5", "p"], recursive=True):
-        text = clean_text(element.get_text(" ", strip=True))
+    for raw_line in container.get_text("\n", strip=True).splitlines():
+        text = clean_text(raw_line)
         if not text:
             continue
 
@@ -525,6 +562,33 @@ def parse_programata_schedule_line(value: str, year_hint: int | None = None) -> 
         "start_hour": start_hour,
         "end_date": end_date,
         "end_hour": end_hour,
+        "place_event": place_value,
+    }
+
+
+def parse_programata_line_schedule(value: str, year_hint: int | None = None) -> dict[str, str]:
+    cleaned_value = clean_text(value)
+    match = PROGRAMATA_LINE_SCHEDULE_RE.fullmatch(cleaned_value)
+    if match is None:
+        raise ValueError(f"Unsupported schedule line: {value}")
+
+    current_year = datetime.now().year
+    year_value = int(match.group("year") or year_hint or current_year)
+    if match.group("year") is None and year_value < current_year:
+        year_value = current_year
+    month_value = parse_bulgarian_month(match.group("month"))
+    start_day = int(match.group("start_day"))
+    end_day = int(match.group("end_day") or start_day)
+    start_date = datetime(year_value, month_value, start_day).date().isoformat()
+    end_date = datetime(year_value, month_value, end_day).date().isoformat()
+    time_value = match.group("time") or "00:00"
+    place_value = clean_text(match.group("place") or match.group("paren_place") or "")
+
+    return {
+        "start_date": start_date,
+        "start_hour": parse_time_value(time_value),
+        "end_date": end_date,
+        "end_hour": parse_time_value(time_value),
         "place_event": place_value,
     }
 
@@ -1076,6 +1140,108 @@ def extract_programata_events_from_page_text(
     return candidate_events
 
 
+def extract_programata_events_from_line_schedule(
+    container: Tag | BeautifulSoup,
+    metadata: dict[str, Any],
+    detail_url: str,
+    category_lookup: dict[str, int],
+    region_lookup: dict[str, int],
+) -> list[dict[str, Any]]:
+    lines = [clean_text(line) for line in container.get_text("\n", strip=True).splitlines()]
+    lines = [line for line in lines if line]
+
+    candidate_events: list[dict[str, Any]] = []
+    seen_keys: set[tuple[Any, ...]] = set()
+    page_title = clean_text(metadata.get("page_title") or metadata.get("card_title") or "")
+    last_place_context = ""
+    found_schedule = False
+
+    def append_event(schedule: dict[str, str], place_event: str) -> None:
+        event_dict = build_programata_event_from_schedule(
+            metadata,
+            detail_url,
+            category_lookup,
+            region_lookup,
+            schedule,
+            place_event=place_event,
+            section_title=metadata.get("breadcrumb_text", ""),
+            title_override=page_title,
+        )
+        dedupe_key = (
+            event_dict["name_event"],
+            event_dict["name_artist"],
+            event_dict["place_event"],
+            event_dict["id_event_category"],
+            event_dict["id_user"],
+            event_dict["id_region"],
+            event_dict["start_date"],
+            event_dict["start_hour"],
+            event_dict["end_date"],
+            event_dict["end_hour"],
+        )
+        if dedupe_key in seen_keys:
+            return
+        seen_keys.add(dedupe_key)
+        candidate_events.append(event_dict)
+
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        lowered = line.casefold()
+
+        if lowered in STOP_SECTION_TITLES:
+            break
+
+        if line in PROGRAMATA_IGNORED_CONTEXT_LINES:
+            index += 1
+            continue
+
+        if line.startswith("Прочети още"):
+            index += 1
+            continue
+
+        schedule: dict[str, str] | None = None
+        advance_by = 1
+
+        if PROGRAMATA_DATE_ONLY_LINE_RE.fullmatch(line):
+            next_line = lines[index + 1] if index + 1 < len(lines) else ""
+            next_time = PROGRAMATA_TIME_ONLY_LINE_RE.fullmatch(next_line)
+            if next_time is not None:
+                combined_value = f"{line.rstrip(':')}, {next_time.group('time')}"
+                if next_time.group("place"):
+                    combined_value += f", {next_time.group('place')}"
+                try:
+                    schedule = parse_programata_line_schedule(combined_value, metadata.get("year_hint"))
+                    advance_by = 2
+                except ValueError:
+                    schedule = None
+            else:
+                try:
+                    schedule = parse_programata_line_schedule(line, metadata.get("year_hint"))
+                except ValueError:
+                    schedule = None
+        else:
+            try:
+                schedule = parse_programata_line_schedule(line, metadata.get("year_hint"))
+            except ValueError:
+                schedule = None
+
+        if schedule is not None:
+            found_schedule = True
+            place_event = schedule.get("place_event") or last_place_context
+            append_event(schedule, place_event)
+            index += advance_by
+            continue
+
+        if not found_schedule:
+            if line != page_title and not line.endswith("| Програмата"):
+                last_place_context = line
+
+        index += 1
+
+    return candidate_events
+
+
 def extract_programata_events_from_heading_schedule(
     container: Tag | BeautifulSoup,
     metadata: dict[str, Any],
@@ -1203,13 +1369,26 @@ def parse_event_card(
             if heading_events:
                 return [event for event in heading_events if not is_event_in_past(event)]
 
+            line_events = extract_programata_events_from_line_schedule(
+                container,
+                metadata,
+                detail_url,
+                category_lookup,
+                region_lookup,
+            )
+            if line_events:
+                return [event for event in line_events if not is_event_in_past(event)]
+
             fallback_events = extract_programata_events_from_page_text(
                 metadata,
                 detail_url,
                 category_lookup,
                 region_lookup,
             )
-            return [event for event in fallback_events if not is_event_in_past(event)]
+            if fallback_events:
+                return [event for event in fallback_events if not is_event_in_past(event)]
+
+            return []
 
         fallback_region_text = " ".join(
             part
@@ -1268,6 +1447,16 @@ def parse_event_card(
 
     if events:
         return events
+
+    line_events = extract_programata_events_from_line_schedule(
+        container,
+        metadata,
+        detail_url,
+        category_lookup,
+        region_lookup,
+    )
+    if line_events:
+        return [event for event in line_events if not is_event_in_past(event)]
 
     fallback_events = extract_programata_events_from_page_text(
         metadata,
@@ -1350,6 +1539,14 @@ def normalize_event_text(value: Any) -> str:
     return clean_text(str(value)) if value is not None else ""
 
 
+def normalize_programata_identity_text(value: Any) -> str:
+    normalized_value = normalize_event_text(value).casefold()
+    normalized_value = normalized_value.replace("–", "-")
+    normalized_value = re.sub(r"[.,;:/()\"'“”„]+", " ", normalized_value)
+    normalized_value = re.sub(r"\s+", " ", normalized_value)
+    return normalized_value.strip()
+
+
 def parse_event_date(value: Any) -> date | None:
     cleaned_value = normalize_event_text(value)
     if not cleaned_value:
@@ -1367,8 +1564,22 @@ def is_placeholder_time(value: Any) -> bool:
 
 def programata_events_share_identity(left: dict[str, Any], right: dict[str, Any]) -> bool:
     return all(
-        normalize_event_text(event_value(left, key)) == normalize_event_text(event_value(right, key))
-        for key in ("name_event", "name_artist", "place_event", "id_event_category", "id_user", "id_region")
+        normalize_programata_identity_text(event_value(left, key)) == normalize_programata_identity_text(event_value(right, key))
+        for key in ("name_event", "name_artist", "id_event_category", "id_user", "id_region")
+    )
+
+
+def programata_events_place_compatible(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    left_place = normalize_programata_identity_text(event_value(left, "place_event"))
+    right_place = normalize_programata_identity_text(event_value(right, "place_event"))
+
+    if not left_place or not right_place:
+        return True
+
+    return (
+        left_place == right_place
+        or left_place in right_place
+        or right_place in left_place
     )
 
 
@@ -1404,6 +1615,7 @@ def programata_events_time_compatible(left: dict[str, Any], right: dict[str, Any
 def programata_events_can_merge(left: dict[str, Any], right: dict[str, Any]) -> bool:
     return (
         programata_events_share_identity(left, right)
+        and programata_events_place_compatible(left, right)
         and programata_events_overlap(left, right)
         and programata_events_time_compatible(left, right)
     )
@@ -1514,7 +1726,14 @@ def verify_supabase_connection(client: Client) -> None:
         raise RuntimeError(f"Could not connect to Supabase: {exc}") from exc
 
 
-def find_existing_event_matches(client: Client, event: dict[str, Any]) -> list[dict[str, Any]]:
+def find_existing_event_matches(
+    client: Client,
+    event: dict[str, Any],
+    existing_events: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    if existing_events is not None:
+        return [row for row in existing_events if programata_events_can_merge(row, event)]
+
     start_date = event_value(event, "start_date")
     end_date = event_value(event, "end_date")
 
@@ -1523,10 +1742,9 @@ def find_existing_event_matches(client: Client, event: dict[str, Any]) -> list[d
 
     query = (
         client.table("events")
-        .select("id_event, start_date, start_hour, end_date, end_hour, description, picture")
+        .select("id_event, name_event, name_artist, place_event, id_event_category, id_user, id_region, start_date, start_hour, end_date, end_hour, description, picture")
         .eq("name_event", event_value(event, "name_event"))
         .eq("name_artist", event_value(event, "name_artist"))
-        .eq("place_event", event_value(event, "place_event"))
         .eq("id_event_category", event_value(event, "id_event_category"))
         .eq("id_user", event_value(event, "id_user"))
         .eq("id_region", event_value(event, "id_region"))
@@ -1535,7 +1753,7 @@ def find_existing_event_matches(client: Client, event: dict[str, Any]) -> list[d
     )
     response = query.execute()
     rows = response.data or []
-    return [row for row in rows if programata_events_time_compatible(row, event)]
+    return [row for row in rows if programata_events_can_merge(row, event)]
 
 
 def choose_canonical_event_match(matches: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1549,14 +1767,38 @@ def choose_canonical_event_match(matches: list[dict[str, Any]]) -> dict[str, Any
     )
 
 
-def upsert_event(client: Client, event: dict[str, Any]) -> dict[str, Any]:
+def sync_existing_event_cache(
+    existing_events: list[dict[str, Any]] | None,
+    removed_event_ids: list[int],
+    stored_event: dict[str, Any],
+) -> None:
+    if existing_events is None:
+        return
+
+    removed_id_set = {int(value) for value in removed_event_ids}
+    existing_events[:] = [row for row in existing_events if int(row.get("id_event") or 0) not in removed_id_set]
+
+    stored_event_id = int(stored_event.get("id_event") or 0)
+    if stored_event_id:
+        existing_events[:] = [row for row in existing_events if int(row.get("id_event") or 0) != stored_event_id]
+
+    existing_events.append(stored_event)
+
+
+def upsert_event(
+    client: Client,
+    event: dict[str, Any],
+    existing_events: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     payload = build_event_payload(event)
-    matching_events = find_existing_event_matches(client, event)
+    matching_events = find_existing_event_matches(client, event, existing_events)
 
     try:
         if not matching_events:
             response = client.table("events").insert(payload).execute()
             logger.info("Inserted event: %s", event_value(event, "name_event"))
+            if existing_events is not None and response.data:
+                sync_existing_event_cache(existing_events, [], response.data[0])
         else:
             canonical_event = choose_canonical_event_match(matching_events)
             merged_payload = merge_programata_event_payload(payload, matching_events)
@@ -1579,6 +1821,9 @@ def upsert_event(client: Client, event: dict[str, Any]) -> dict[str, Any]:
 
                 client.table("events").delete().in_("id_event", duplicate_event_ids).execute()
 
+            if existing_events is not None and response.data:
+                sync_existing_event_cache(existing_events, duplicate_event_ids, response.data[0])
+
             logger.info("Updated event %s: %s", canonical_event_id, event_value(event, "name_event"))
     except Exception as exc:  # supabase-py raises multiple exception types depending on the failure.
         logger.error("Failed to upsert event '%s': %s", event_value(event, "name_event"), exc)
@@ -1597,6 +1842,12 @@ def main() -> int:
         help="Events page URL (defaults to Programata.bg homepage)",
     )
     parser.add_argument(
+        "--max-events",
+        type=int,
+        default=int(os.environ["SCRAPER_MAX_EVENTS"]) if os.environ.get("SCRAPER_MAX_EVENTS") else None,
+        help="Maximum number of events to process from the parsed result set.",
+    )
+    parser.add_argument(
         "--default-user-id",
         type=int,
         default=int(os.environ["SCRAPER_DEFAULT_USER_ID"]) if os.environ.get("SCRAPER_DEFAULT_USER_ID") else None,
@@ -1609,9 +1860,13 @@ def main() -> int:
         verify_supabase_connection(client)
         region_lookup, category_lookup = load_lookup_maps(client)
         default_user_id = resolve_default_user_id(client, args.default_user_id)
+        existing_events = load_existing_programata_events(client)
 
         html = fetch_html(args.url)
         events = parse_events(html, region_lookup, category_lookup, default_user_id, args.url)
+
+        if args.max_events is not None:
+            events = events[:args.max_events]
 
         if not events:
             logger.warning("No events found on the page.")
@@ -1619,7 +1874,7 @@ def main() -> int:
 
         processed = 0
         for event in events:
-            upsert_event(client, event)
+            upsert_event(client, event, existing_events)
             processed += 1
 
         logger.info("Processed %s events.", processed)
