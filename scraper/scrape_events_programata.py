@@ -79,6 +79,7 @@ PROGRAMATA_CATEGORY_SYNONYMS = {
 PROGRAMATA_DEFAULT_CATEGORY_NAME = "Фестивали"
 PROGRAMATA_DEFAULT_REGION_NAME = "Непосочен регион"
 PROGRAMATA_DEFAULT_SOURCE_URL = "https://programata.bg/"
+PROGRAMATA_SOURCE_NAME = "programata"
 GOOGLE_REGION_LOOKUP_ENABLED = os.environ.get("SCRAPER_REGION_LOOKUP_GOOGLE", "1").strip().casefold() in {
     "1",
     "true",
@@ -98,6 +99,9 @@ PROGRAMATA_PATH_CATEGORY_HINTS = [
 ]
 
 EVENT_PAYLOAD_KEYS = [
+    "source_name",
+    "source_event_key",
+    "source_url",
     "name_event",
     "name_artist",
     "place_event",
@@ -453,10 +457,17 @@ def load_lookup_maps(client: Client) -> tuple[dict[str, int], dict[str, int]]:
 def load_existing_programata_events(client: Client) -> list[dict[str, Any]]:
     response = (
         client.table("events")
-        .select("id_event, name_event, name_artist, place_event, id_event_category, id_user, id_region, start_date, start_hour, end_date, end_hour, description, picture")
+        .select("id_event, source_name, source_event_key, source_url, name_event, name_artist, place_event, id_event_category, id_user, id_region, start_date, start_hour, end_date, end_hour, description, picture")
         .execute()
     )
     return response.data or []
+
+
+def apply_programata_source_identity(event_dict: dict[str, Any], source_key: str) -> dict[str, Any]:
+    event_dict["source_name"] = PROGRAMATA_SOURCE_NAME
+    event_dict["source_event_key"] = clean_text(source_key)
+    event_dict["source_url"] = clean_text(event_dict.get("source_url") or source_key)
+    return event_dict
 
 
 def first_match_text(root: Tag | BeautifulSoup, selectors: list[str], attribute: str | None = None) -> str:
@@ -939,7 +950,7 @@ def build_programata_event_dict(
         event_dict["name_event"] = clean_text(strip_trailing_year(event_dict["name_event"]))
         event_dict["description"] = clean_text(event_dict["description"])
         event_dict["picture"] = clean_text(event_dict["picture"]) or None
-        events.append(event_dict)
+        events.append(apply_programata_source_identity(event_dict, block_url))
 
     for part in description_parts:
         try:
@@ -1018,7 +1029,7 @@ def build_programata_event_from_schedule(
     }
 
     event_dict["picture"] = clean_text(event_dict["picture"]) or None
-    return event_dict
+    return apply_programata_source_identity(event_dict, detail_url)
 
 
 def extract_programata_events_from_page_text(
@@ -1415,7 +1426,7 @@ def parse_event_card(
 
         if is_event_in_past(fallback_event):
             return []
-        return [fallback_event]
+        return [apply_programata_source_identity(fallback_event, detail_url)]
 
     events: list[dict[str, Any]] = []
     seen_keys: set[tuple[Any, ...]] = set()
@@ -1745,6 +1756,31 @@ def find_existing_event_matches(
     event: dict[str, Any],
     existing_events: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
+    source_name = normalize_event_text(event_value(event, "source_name"))
+    source_event_key = normalize_event_text(event_value(event, "source_event_key"))
+
+    if source_name and source_event_key:
+        if existing_events is not None:
+            source_matches = [
+                row
+                for row in existing_events
+                if normalize_event_text(row.get("source_name")) == source_name
+                and normalize_event_text(row.get("source_event_key")) == source_event_key
+            ]
+            if source_matches:
+                return source_matches
+        else:
+            response = (
+                client.table("events")
+                .select("id_event, source_name, source_event_key, source_url, name_event, name_artist, place_event, id_event_category, id_user, id_region, start_date, start_hour, end_date, end_hour, description, picture")
+                .eq("source_name", source_name)
+                .eq("source_event_key", source_event_key)
+                .execute()
+            )
+            source_matches = response.data or []
+            if source_matches:
+                return source_matches
+
     if existing_events is not None:
         return [row for row in existing_events if programata_events_can_merge(row, event)]
 

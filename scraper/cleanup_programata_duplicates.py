@@ -38,7 +38,7 @@ def event_group_key(event: dict[str, Any]) -> tuple[str, str, str, str]:
 
 def build_duplicate_clusters(events: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
     clusters: list[list[dict[str, Any]]] = []
-    grouped_events: dict[tuple[str, str, str, str, str], list[dict[str, Any]]] = {}
+    grouped_events: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
 
     for event in events:
         grouped_events.setdefault(event_group_key(event), []).append(event)

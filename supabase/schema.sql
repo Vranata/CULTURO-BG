@@ -218,6 +218,9 @@ create table if not exists public.events (
   name_event text not null,
   name_artist text not null,
   place_event text not null default '',
+  source_name text,
+  source_event_key text,
+  source_url text,
   id_event_category smallint not null references public.event_category(id_event_category) on update cascade on delete restrict,
   id_user bigint not null references public.users(id_user) on update cascade on delete cascade,
   id_region smallint not null references public.regions(id_region) on update cascade on delete restrict,
@@ -270,6 +273,8 @@ create index if not exists idx_users_region on public.users (id_region);
 create index if not exists idx_events_category on public.events (id_event_category);
 create index if not exists idx_events_user on public.events (id_user);
 create index if not exists idx_events_region on public.events (id_region);
+create unique index if not exists uq_events_source_identity on public.events (source_name, source_event_key)
+where source_name is not null and source_event_key is not null;
 create unique index if not exists uq_events_programata_canonical_key on public.events (
   public.normalize_event_dedupe_text(name_event),
   public.normalize_event_dedupe_text(name_artist),
