@@ -12,7 +12,7 @@ import logging
 import os
 import re
 from datetime import date, datetime, timedelta
-from urllib.parse import urljoin, urlparse, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 from typing import Any
 
 import requests
@@ -28,6 +28,7 @@ from scrape_events_programata import (
     resolve_lookup_id,
     resolve_region_id_from_text,
     resolve_default_user_id,
+    normalize_region_key,
     upsert_event,
     verify_supabase_connection,
 )
@@ -48,8 +49,49 @@ ALLEVENTS_TITLE_SELECTOR = "div.title a[href]"
 ALLEVENTS_LOCATION_SELECTOR = "div.location"
 ALLEVENTS_DATE_SELECTOR = "div.meta-top"
 ALLEVENTS_IMAGE_SELECTOR = "div.banner-cont img[src]"
+ALLEVENTS_CITY_PAGE_EXCLUSIONS = {"Непосочен регион", "Софийска област"}
+ALLEVENTS_REGION_NAME_TO_CITY_SLUG_EXCEPTIONS = {
+    "софия – град": "sofia",
+    "софия - град": "sofia",
+    "софия-град": "sofia",
+    "софия град": "sofia",
+    "русе": "ruse-ru",
+}
+ALLEVENTS_BG_CYRILLIC_TO_LATIN = {
+    "а": "a",
+    "б": "b",
+    "в": "v",
+    "г": "g",
+    "д": "d",
+    "е": "e",
+    "ж": "zh",
+    "з": "z",
+    "и": "i",
+    "й": "y",
+    "к": "k",
+    "л": "l",
+    "м": "m",
+    "н": "n",
+    "о": "o",
+    "п": "p",
+    "р": "r",
+    "с": "s",
+    "т": "t",
+    "у": "u",
+    "ф": "f",
+    "х": "h",
+    "ц": "ts",
+    "ч": "ch",
+    "ш": "sh",
+    "щ": "sht",
+    "ъ": "a",
+    "ь": "y",
+    "ю": "yu",
+    "я": "ya",
+}
 
 ALLEVENTS_CITY_SLUG_TO_REGION_NAME = {
+    "blagoevgrad": "Благоевград",
     "burgas": "Бургас",
     "dobrich": "Добрич",
     "gabrovo": "Габрово",
@@ -63,15 +105,14 @@ ALLEVENTS_CITY_SLUG_TO_REGION_NAME = {
     "pleven": "Плевен",
     "plovdiv": "Пловдив",
     "razgrad": "Разград",
-    "ruse": "Русе",
     "ruse-ru": "Русе",
     "silistra": "Силистра",
     "sliven": "Сливен",
     "smolyan": "Смолян",
     "sofia": "София",
-    "sofia-oblast": "Софийска област",
     "stara-zagora": "Стара Загора",
     "targovishte": "Търговище",
+    "shumen": "Шумен",
     "varna": "Варна",
     "veliko-tarnovo": "Велико Търново",
     "vidin": "Видин",
@@ -159,6 +200,22 @@ def clean_text(value: Any) -> str:
     if value is None:
         return ""
     return " ".join(str(value).split()).strip()
+
+
+def normalize_allevents_city_slug(value: str) -> str:
+    cleaned_value = clean_text(unquote(value))
+    if not cleaned_value:
+        return ""
+    return re.sub(r"\s+", "-", cleaned_value.casefold())
+
+
+def transliterate_allevents_bg_text(value: str) -> str:
+    result_parts: list[str] = []
+    for character in clean_text(value).casefold():
+        result_parts.append(ALLEVENTS_BG_CYRILLIC_TO_LATIN.get(character, character))
+    normalized_value = "".join(result_parts)
+    normalized_value = re.sub(r"[^a-z0-9]+", "-", normalized_value)
+    return normalized_value.strip("-")
 
 
 def canonicalize_url(value: str) -> str:
@@ -364,10 +421,65 @@ def extract_page_city_slug(url: str | None) -> str:
     path_parts = [part for part in parsed_url.path.split("/") if part]
     if not path_parts:
         return ""
-    first_part = path_parts[0].casefold()
+    first_part = normalize_allevents_city_slug(path_parts[0])
     if first_part in {"events", "location.php", "pages", "blog"}:
         return ""
     return first_part
+
+
+def derive_allevents_city_slug(region_name: str) -> str:
+    normalized_region_name = normalize_region_key(region_name)
+    if not normalized_region_name or normalized_region_name in {normalize_region_key(value) for value in ALLEVENTS_CITY_PAGE_EXCLUSIONS}:
+        return ""
+
+    for candidate_name, city_slug in ALLEVENTS_REGION_NAME_TO_CITY_SLUG_EXCEPTIONS.items():
+        if normalized_region_name == normalize_region_key(candidate_name):
+            return city_slug
+
+    return transliterate_allevents_bg_text(region_name)
+
+
+def build_allevents_city_page_urls(region_lookup: dict[str, int]) -> list[str]:
+    city_urls: list[str] = []
+    seen_urls: set[str] = set()
+
+    for region_name in region_lookup.keys():
+        city_slug = derive_allevents_city_slug(region_name)
+        if not city_slug:
+            continue
+
+        city_root = f"https://allevents.in/{quote(city_slug, safe='-')}"
+        for candidate_url in [f"{city_root}?ref=cityselect", f"{city_root}/recently-added?ref=cityselect"]:
+            normalized_url = canonicalize_url(candidate_url) or candidate_url
+            if normalized_url in seen_urls:
+                continue
+            seen_urls.add(normalized_url)
+            city_urls.append(candidate_url)
+
+    return city_urls
+
+
+def build_allevents_source_urls(start_url: str, region_lookup: dict[str, int]) -> list[str]:
+    source_urls: list[str] = []
+    seen_urls: set[str] = set()
+
+    def add_url(candidate_url: str) -> None:
+        normalized_url = canonicalize_url(candidate_url) or candidate_url
+        if normalized_url in seen_urls:
+            return
+        seen_urls.add(normalized_url)
+        source_urls.append(candidate_url)
+
+    start_city_slug = extract_page_city_slug(start_url)
+    if start_city_slug:
+        add_url(start_url)
+        if not clean_text(urlparse(start_url).path).endswith("recently-added"):
+            add_url(urljoin(start_url.rstrip("/") + "/", "recently-added"))
+
+    for city_url in build_allevents_city_page_urls(region_lookup):
+        add_url(city_url)
+
+    return source_urls
 
 
 def resolve_allevents_region_id(
@@ -560,6 +672,7 @@ def parse_events(
     soup = BeautifulSoup(html, "html.parser")
     records: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
+    source_page_city_slug = extract_page_city_slug(source_url)
 
     for index, card in enumerate(soup.select(ALLEVENTS_CARD_SELECTOR), start=1):
         if not isinstance(card, Tag):
@@ -576,6 +689,11 @@ def parse_events(
 
         if is_event_in_past(event):
             continue
+
+        if source_page_city_slug:
+            event_city_slug = extract_page_city_slug(event.get("source_url"))
+            if event_city_slug and event_city_slug != source_page_city_slug:
+                continue
 
         event_key = clean_text(event.get("source_url") or event.get("name_event") or "")
         if event_key in seen_keys:
@@ -599,6 +717,11 @@ def parse_events(
 
         if is_event_in_past(event):
             continue
+
+        if source_page_city_slug:
+            event_city_slug = extract_page_city_slug(event.get("source_url"))
+            if event_city_slug and event_city_slug != source_page_city_slug:
+                continue
 
         event_key = clean_text(event.get("source_url") or event.get("name_event") or "")
         if event_key in seen_keys:
@@ -636,10 +759,7 @@ def main() -> int:
         default_user_id = resolve_default_user_id(client, args.default_user_id)
         existing_events = load_existing_programata_events(client)
 
-        source_urls = [args.url]
-        parsed_url = urlparse(args.url)
-        if not clean_text(parsed_url.path).endswith("recently-added"):
-            source_urls.append(urljoin(args.url.rstrip("/") + "/", "recently-added"))
+        source_urls = build_allevents_source_urls(args.url, region_lookup)
 
         events: list[dict[str, Any]] = []
         seen_source_urls: set[str] = set()
