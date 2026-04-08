@@ -39,3 +39,30 @@ def source_identity_matches(left: dict[str, Any], right: dict[str, Any]) -> bool
         clean_shared_text(left.get("source_name")).casefold() == clean_shared_text(right.get("source_name")).casefold()
         and clean_shared_text(left.get("source_event_key")).casefold() == clean_shared_text(right.get("source_event_key")).casefold()
     )
+
+
+def build_prepared_event_signature(event: dict[str, Any]) -> str:
+    parts = [
+        clean_shared_text(event.get("name_event")).casefold(),
+        clean_shared_text(event.get("place_event")).casefold(),
+        clean_shared_text(event.get("id_region")).casefold(),
+        clean_shared_text(event.get("start_date")).casefold(),
+        clean_shared_text(event.get("start_hour")).casefold(),
+        clean_shared_text(event.get("end_date")).casefold(),
+        clean_shared_text(event.get("end_hour")).casefold(),
+    ]
+    return "|".join(parts)
+
+
+def dedupe_prepared_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped_events: list[dict[str, Any]] = []
+    seen_signatures: set[str] = set()
+
+    for event in events:
+        signature = build_prepared_event_signature(event)
+        if signature in seen_signatures:
+            continue
+        seen_signatures.add(signature)
+        deduped_events.append(event)
+
+    return deduped_events

@@ -18,7 +18,7 @@ from typing import Any
 import requests
 from bs4 import BeautifulSoup, Tag
 
-from shared_source import stamp_source_identity
+from shared_source import dedupe_prepared_events, stamp_source_identity
 from scrape_events_programata import (
     build_region_alias_lookup,
     create_supabase_client,
@@ -152,6 +152,20 @@ ALLEVENTS_TITLE_SUFFIX_PATTERNS = [
     re.compile(r"\s*(?:\|+|,|[-–/]|[@*]+)\s*\d{1,2}\.\d{1,2}\.\d{2,4}$", re.IGNORECASE),
     re.compile(r"\s*(?:\|+|,|[-–/]|[@*]+)\s*\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}$", re.IGNORECASE),
 ]
+ALLEVENTS_IGNORED_SECTION_TITLES = (
+    "frequently asked questions",
+    "trending searches",
+    "events in nearby cities",
+    "host events",
+    "discover events",
+    "explore events around you",
+    "explore events by date",
+    "best of",
+    "welcome to allevents.in",
+    "join the people turning moments into memories",
+    "about",
+    "careers",
+)
 ALLEVENTS_THEATRE_KEYWORDS = (
     "theatre",
     "theater",
@@ -252,6 +266,13 @@ def extract_section_title(card: Tag) -> str:
     if heading is None:
         return ""
     return clean_text(heading.get_text(" ", strip=True))
+
+
+def is_ignored_allevents_section(section_title: str) -> bool:
+    lowered_title = clean_text(section_title).casefold()
+    if not lowered_title:
+        return False
+    return any(keyword in lowered_title for keyword in ALLEVENTS_IGNORED_SECTION_TITLES)
 
 
 def extract_meta_text(card: Tag, selector: str) -> str:
@@ -512,6 +533,21 @@ def resolve_allevents_region_id(
     return None
 
 
+def resolve_allevents_page_region_id(region_lookup: dict[str, int], source_page_url: str | None) -> int | None:
+    page_city_slug = extract_page_city_slug(source_page_url)
+    if not page_city_slug:
+        return None
+
+    region_name = ALLEVENTS_CITY_SLUG_TO_REGION_NAME.get(page_city_slug)
+    if not region_name:
+        return None
+
+    try:
+        return resolve_lookup_id(region_name, region_lookup, "region")
+    except ValueError:
+        return None
+
+
 def build_description(section_title: str, location_text: str, title: str) -> str:
     description_value = clean_text(" | ".join(part for part in [section_title, location_text, title] if part))
     if description_value:
@@ -673,6 +709,7 @@ def parse_events(
     records: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
     source_page_city_slug = extract_page_city_slug(source_url)
+    page_region_id = resolve_allevents_page_region_id(region_lookup, source_url)
 
     for index, card in enumerate(soup.select(ALLEVENTS_CARD_SELECTOR), start=1):
         if not isinstance(card, Tag):
@@ -690,10 +727,16 @@ def parse_events(
         if is_event_in_past(event):
             continue
 
+        if is_ignored_allevents_section(clean_text(event.get("section_title"))):
+            continue
+
         if source_page_city_slug:
             event_city_slug = extract_page_city_slug(event.get("source_url"))
             if event_city_slug and event_city_slug != source_page_city_slug:
                 continue
+
+        if page_region_id is not None and event.get("id_region") != page_region_id:
+            continue
 
         event_key = clean_text(event.get("source_url") or event.get("name_event") or "")
         if event_key in seen_keys:
@@ -718,10 +761,16 @@ def parse_events(
         if is_event_in_past(event):
             continue
 
+        if is_ignored_allevents_section(clean_text(event.get("section_title"))):
+            continue
+
         if source_page_city_slug:
             event_city_slug = extract_page_city_slug(event.get("source_url"))
             if event_city_slug and event_city_slug != source_page_city_slug:
                 continue
+
+        if page_region_id is not None and event.get("id_region") != page_region_id:
+            continue
 
         event_key = clean_text(event.get("source_url") or event.get("name_event") or "")
         if event_key in seen_keys:
@@ -770,6 +819,11 @@ def main() -> int:
             seen_source_urls.add(normalized_source_page_url)
             html = fetch_html(source_page_url)
             events.extend(parse_events(html, region_lookup, category_lookup, default_user_id, source_page_url))
+
+        deduped_events = dedupe_prepared_events(events)
+        if len(deduped_events) != len(events):
+            logger.info("Removed %s duplicate prepared events.", len(events) - len(deduped_events))
+        events = deduped_events
 
         if not events:
             logger.warning("No events found on the page.")
