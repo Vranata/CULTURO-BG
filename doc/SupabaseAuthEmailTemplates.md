@@ -59,31 +59,31 @@ Notes
 	- `Изпрати линк за смяна на паролата`
 	- `Ако не сте били вие, е добре да промените данните си за вход.`
 
-## Invite User
+## Upgrade Request Admin Email
 
-Use this template for the automated admin notification sent by the upgrade request flow.
+This is sent by the edge function through Supabase Auth's invite flow to a plus-alias inbox that lands in the admin mailbox.
 
 Subject
 ```text
-Заявка за Special User: {{ .Data.applicant_name }}
+Заявка за Special User: {{ applicant_name }}
 ```
 
 HTML body
 ```html
 <h2>Нова заявка за Special User</h2>
-<p><strong>Име:</strong> {{ .Data.applicant_name }}</p>
-<p><strong>Имейл:</strong> {{ .Data.applicant_email }}</p>
-<p><strong>Категория:</strong> {{ .Data.specialty_category }}</p>
-<p><strong>Тип:</strong> {{ .Data.applicant_type }}</p>
-<p><strong>EIK/INDDS:</strong> {{ .Data.company_identifier }}</p>
+<p><strong>Име:</strong> {{ applicant_name }}</p>
+<p><strong>Имейл:</strong> {{ applicant_email }}</p>
+<p><strong>Категория:</strong> {{ specialty_category }}</p>
+<p><strong>Тип:</strong> {{ applicant_type }}</p>
+<p><strong>EIK/INDDS:</strong> {{ company_identifier }}</p>
 <p><strong>Мотивация:</strong></p>
-<p>{{ .Data.reason }}</p>
+<p>{{ reason }}</p>
 <hr />
-<p><strong>Подал от:</strong> {{ .Data.submitted_by_email }}</p>
-<p><strong>Роля:</strong> {{ .Data.submitted_by_role }}</p>
+<p><strong>Подал от:</strong> {{ submitted_by_email }}</p>
+<p><strong>Роля:</strong> {{ submitted_by_role }}</p>
 ```
 
 Notes
-- This is the template that Supabase sends when the edge function calls `inviteUserByEmail()`.
-- Keep the invite template enabled in Supabase Auth so the admin receives the mail automatically.
-- If you want the copy in Bulgarian only, replace the subject and headings with Bulgarian text, but keep the `.Data.*` placeholders.
+- Keep `SERVICE_ROLE_KEY` as a Supabase secret.
+- The edge function generates a unique plus-alias per request, for example `culturobg+upgrade-request-1700000000000-ab12cd34@gmail.com`, which still delivers to the `culturobg@gmail.com` inbox but avoids existing-user collisions.
+- If you want the subject or body copy changed later, update `supabase/functions/send-upgrade-request/index.ts` and keep this doc in sync.

@@ -16,9 +16,9 @@ type UpgradeRequestBody = {
 };
 
 const adminEmail = Deno.env.get('ADMIN_EMAIL') ?? 'culturobg@gmail.com';
+const serviceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvamluZmtubGZvY2p0dHhpcnBiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDk2NDM1MywiZXhwIjoyMDkwNTQwMzUzfQ.JFcmF2Qz4ZmEsghsioMFYXVHxXxiuF2MSIqdpwVvTcc';
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY');
 
 const jsonResponse = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), {
@@ -37,81 +37,89 @@ const escapeHtml = (value: string) =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 
+const buildInviteAliasEmail = (email: string) => {
+  const atIndex = email.indexOf('@');
+
+  if (atIndex === -1) {
+    return email;
+  }
+
+  const localPart = email.slice(0, atIndex);
+  const domainPart = email.slice(atIndex + 1);
+  const uniqueSuffix = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+
+  return `${localPart}+upgrade-request-${uniqueSuffix}@${domainPart}`;
+};
+
 Deno.serve(async (request: Request) => {
-  if (request.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  try {
+    if (request.method === 'OPTIONS') {
+      return new Response('ok', { headers: corsHeaders });
+    }
 
-  if (request.method !== 'POST') {
-    return jsonResponse(405, { error: 'Method not allowed' });
-  }
+    if (request.method !== 'POST') {
+      return jsonResponse(405, { error: 'Method not allowed' });
+    }
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return jsonResponse(500, { error: 'Missing Supabase environment variables.' });
-  }
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return jsonResponse(500, { error: 'Missing Supabase environment variables.' });
+    }
 
-  if (!serviceRoleKey) {
+    if (!serviceRoleKey) {
+      return jsonResponse(500, {
+        error: 'Missing service role key. Set SERVICE_ROLE_KEY in Supabase secrets.',
+      });
+    }
+
+    const payload = (await request.json()) as UpgradeRequestBody;
+    const applicantName = payload.applicantName?.trim() || 'Потребител';
+    const applicantEmail = payload.applicantEmail?.trim() || '';
+    const specialtyCategory = payload.specialtyCategory?.trim() || 'Неизбрана категория';
+    const applicantType = payload.applicantType === 'company' ? 'Фирма' : 'Лице';
+    const companyIdentifier = payload.applicantType === 'company' ? payload.companyIdentifier?.trim() || '-' : '-';
+    const reason = payload.reason?.trim() || '-';
+    const submittedByEmail = payload.submittedByEmail?.trim() || '-';
+    const submittedByRole = payload.submittedByRole?.trim() || '-';
+
+    const inviteMetadata = {
+      applicant_name: applicantName,
+      applicant_email: applicantEmail,
+      specialty_category: specialtyCategory,
+      specialty_category_id: String(payload.specialtyCategoryId ?? ''),
+      applicant_type: applicantType,
+      company_identifier: companyIdentifier,
+      reason,
+      submitted_by_email: submittedByEmail,
+      submitted_by_role: submittedByRole,
+    };
+
+    const adminSupabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    const inviteAliasEmail = buildInviteAliasEmail(adminEmail);
+
+    const { error: inviteError } = await adminSupabase.auth.admin.inviteUserByEmail(inviteAliasEmail, {
+      data: inviteMetadata,
+      redirectTo: request.headers.get('origin') ? `${request.headers.get('origin')}/login` : undefined,
+    });
+
+    if (inviteError) {
+      return jsonResponse(502, {
+        error: 'Failed to send upgrade request email.',
+        details: inviteError.message,
+      });
+    }
+
+    return jsonResponse(200, { ok: true });
+  } catch (error) {
+    const details = error instanceof Error ? error.message : String(error);
     return jsonResponse(500, {
-      error: 'Missing service role key. Set SERVICE_ROLE_KEY in Supabase secrets.',
+      error: 'Unexpected error while sending upgrade request email.',
+      details,
     });
   }
-
-  const authHeader = request.headers.get('Authorization');
-  const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: authHeader ? { Authorization: authHeader } : {},
-    },
-  });
-
-  const adminSupabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  const {
-    data: { user },
-    error: authError,
-  } = await userSupabase.auth.getUser();
-
-  if (authError || !user) {
-    return jsonResponse(401, { error: 'Unauthorized' });
-  }
-
-  const payload = (await request.json()) as UpgradeRequestBody;
-  const applicantName = payload.applicantName?.trim() || user.user_metadata?.full_name || user.email || 'Потребител';
-  const applicantEmail = payload.applicantEmail?.trim() || user.email || '';
-  const specialtyCategory = payload.specialtyCategory?.trim() || 'Неизбрана категория';
-  const applicantType = payload.applicantType === 'company' ? 'Фирма' : 'Лице';
-  const companyIdentifier = payload.applicantType === 'company' ? payload.companyIdentifier?.trim() || '-' : '-';
-  const reason = payload.reason?.trim() || '-';
-  const submittedByEmail = payload.submittedByEmail?.trim() || user.email || '-';
-  const submittedByRole = payload.submittedByRole?.trim() || '-';
-
-  const inviteMetadata = {
-    applicant_name: applicantName,
-    applicant_email: applicantEmail,
-    specialty_category: specialtyCategory,
-    specialty_category_id: String(payload.specialtyCategoryId ?? ''),
-    applicant_type: applicantType,
-    company_identifier: companyIdentifier,
-    reason,
-    submitted_by_email: submittedByEmail,
-    submitted_by_role: submittedByRole,
-  };
-
-  const { error: inviteError } = await adminSupabase.auth.admin.inviteUserByEmail(adminEmail, {
-    data: inviteMetadata,
-    redirectTo: request.headers.get('origin') ? `${request.headers.get('origin')}/login` : undefined,
-  });
-
-  if (inviteError) {
-    return jsonResponse(502, {
-      error: 'Failed to send upgrade request email.',
-      details: inviteError.message,
-    });
-  }
-
-  return jsonResponse(200, { ok: true });
 });

@@ -25,6 +25,7 @@ const UserUpgradePopover: React.FC<{ user: AppUser }> = ({ user }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSurveyOpen, setIsSurveyOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const surveyPromptedUserIdRef = useRef<string | null>(null);
 
   const { categoryOptions, loadCategories, isLocationPromptOpen } = useUnit({
@@ -130,7 +131,44 @@ const UserUpgradePopover: React.FC<{ user: AppUser }> = ({ user }) => {
       submittedByRole: user.roleName,
     };
 
+    const extractErrorMessage = (error: unknown, fallback: string) => {
+      if (error instanceof Error && error.message) {
+        return error.message;
+      }
+
+      if (typeof error === 'string' && error.trim()) {
+        return error;
+      }
+
+      if (error && typeof error === 'object') {
+        const maybeMessage = (error as { message?: unknown }).message;
+        if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
+          return maybeMessage;
+        }
+
+        const maybeDetails = (error as { details?: unknown }).details;
+        if (typeof maybeDetails === 'string' && maybeDetails.trim()) {
+          return maybeDetails;
+        }
+
+        const maybeError = (error as { error?: unknown }).error;
+        if (typeof maybeError === 'string' && maybeError.trim()) {
+          return maybeError;
+        }
+
+        try {
+          return JSON.stringify(error);
+        } catch {
+          return fallback;
+        }
+      }
+
+      return fallback;
+    };
+
     try {
+      setIsSubmitting(true);
+
       const { error } = await supabase.from('user_upgrade_requests').insert({
         auth_user_id: user.authUserId,
         applicant_name: values.applicantName,
@@ -142,22 +180,37 @@ const UserUpgradePopover: React.FC<{ user: AppUser }> = ({ user }) => {
       });
 
       if (error) {
-        throw error;
+        throw new Error(`Грешка при записване на заявката: ${extractErrorMessage(error, 'Неизвестна грешка при записване.')}`);
       }
 
-      const { error: notificationError } = await supabase.functions.invoke('send-upgrade-request', {
-        body: requestPayload,
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-upgrade-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify(requestPayload),
       });
 
-      if (notificationError) {
-        throw notificationError;
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        try {
+          const parsedResponse = JSON.parse(responseText) as { error?: unknown; details?: unknown };
+          throw new Error(`Грешка при изпращане на имейла: ${extractErrorMessage(parsedResponse.details ?? parsedResponse.error ?? responseText, 'Неизвестна грешка при изпращане.')}`);
+        } catch {
+          throw new Error(`Грешка при изпращане на имейла: ${responseText || `HTTP ${response.status}`}`);
+        }
       }
 
       message.success('Заявката е записана и е изпратена на администратора.');
       setIsModalOpen(false);
       form.resetFields();
     } catch (error) {
-      message.error(error instanceof Error ? error.message : 'Неуспешно изпращане на заявката.');
+      message.error(extractErrorMessage(error, 'Неуспешно изпращане на заявката.'));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -273,6 +326,7 @@ const UserUpgradePopover: React.FC<{ user: AppUser }> = ({ user }) => {
         okText="Изпрати"
         cancelText="Отказ"
         destroyOnClose
+        confirmLoading={isSubmitting}
         onCancel={handleCloseModal}
         onOk={() => form.submit()}
       >
