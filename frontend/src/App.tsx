@@ -14,6 +14,7 @@ import EventDetails from './pages/EventDetails/index';
 import Favorites from './pages/Favorites/index';
 import Login from './pages/Login/index';
 import Recommended from './pages/Recommended/index';
+import LocationInitializer from './components/LocationInitializer';
 
 const { Header, Content, Footer } = Layout;
 
@@ -138,6 +139,8 @@ const App: React.FC = () => {
   return (
     <ConfigProvider theme={themeConfig}>
       <Layout className="layout" data-theme={themeMode} style={{ minHeight: '100vh', background: 'var(--page-bg)', position: 'relative', overflow: 'hidden' }}>
+        <LocationInitializer />
+
         {themeMode === 'orange' && (
           <>
             <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle at 15% 20%, rgba(198,90,0,0.18) 0, rgba(198,90,0,0.18) 2px, transparent 2px), radial-gradient(circle at 80% 15%, rgba(198,90,0,0.12) 0, rgba(198,90,0,0.12) 1px, transparent 1px), radial-gradient(circle at 70% 80%, rgba(198,90,0,0.12) 0, rgba(198,90,0,0.12) 1px, transparent 1px)', backgroundSize: '180px 180px', opacity: 0.55 }} />

@@ -627,6 +627,62 @@
   margin: 8px 12px;
 }
 
+.events-sort-group {
+  margin-top: 14px;
+}
+
+.events-sort-title {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.events-sort-list {
+  display: grid;
+  gap: 8px;
+}
+
+.events-sort-button {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.events-sort-button .ant-btn-icon {
+  margin-inline-end: 8px;
+}
+
+.events-search-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.events-search-row .ant-input-affix-wrapper {
+  flex: 5 1 0;
+  width: auto;
+}
+
+.events-search-row .events-search-button {
+  flex: 0 0 28px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 !important;
+  align-self: center;
+  border-radius: 999px;
+}
+
+.events-search-row .events-search-button .anticon {
+  font-size: 12px;
+}
+
+.events-search-row .events-search-button .ant-btn-icon {
+  margin-inline-end: 0;
+}
+
 .events-filters-panel .ant-input-affix-wrapper,
 .events-filters-panel .ant-select-selector,
 .events-filters-panel .ant-picker,
@@ -645,10 +701,30 @@
   width: 100%;
 }
 
+.events-filters-panel .events-search-row .events-search-button.ant-btn {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 !important;
+  border-radius: 999px;
+  flex: 0 0 28px;
+}
+
 .events-filters-panel .ant-input-affix-wrapper,
 .events-filters-panel .ant-select,
 .events-filters-panel .ant-picker {
   width: 100%;
+}
+
+.events-filters-panel .events-search-row .ant-input-affix-wrapper {
+  flex: 6 1 0;
+  width: auto;
+}
+
+.events-filters-panel .events-search-row .ant-btn {
+  flex: 0 0 28px;
+  width: 28px;
+  padding-inline: 0;
 }
 
 .events-event-card {
@@ -698,9 +774,30 @@
   margin-top: auto;
 }
 
+.events-event-actions .google-calendar-button,
+.events-event-actions .event-share-button,
+.events-event-actions .event-like-button {
+  width: 38px;
+  min-width: 38px;
+  padding-inline: 0;
+  border-radius: 999px;
+}
+
 .events-event-actions > a,
 .events-event-actions .event-like-button {
   flex: 0 0 auto;
+}
+
+.events-event-actions .google-calendar-button .ant-btn-icon,
+.events-event-actions .event-share-button .ant-btn-icon,
+.events-event-actions .event-like-button .ant-btn-icon {
+  margin-inline-end: 0;
+}
+
+.events-event-actions .google-calendar-button .anticon,
+.events-event-actions .event-share-button .anticon,
+.events-event-actions .event-like-button .anticon {
+  font-size: 14px;
 }
 
 .events-event-admin-actions {

@@ -10,9 +10,10 @@ type EventLikeButtonProps = {
   eventId: string;
   compact?: boolean;
   block?: boolean;
+  iconOnly?: boolean;
 };
 
-const EventLikeButton: React.FC<EventLikeButtonProps> = ({ eventId, compact = false, block = false }) => {
+const EventLikeButton: React.FC<EventLikeButtonProps> = ({ eventId, compact = false, block = false, iconOnly = false }) => {
   const { user, likedEventIds, toggleLike, isToggling } = useUnit({
     user: $user,
     likedEventIds: $likedEventIds,
@@ -68,17 +69,21 @@ const EventLikeButton: React.FC<EventLikeButtonProps> = ({ eventId, compact = fa
       loading={isToggling}
       block={block}
       size={compact ? 'small' : 'middle'}
+      title={isLiked ? 'Харесано' : 'Харесай'}
+      aria-label={isLiked ? 'Харесано' : 'Харесай'}
       style={{
-        minWidth: compact ? 118 : 138,
+        width: iconOnly ? (compact ? 34 : 38) : undefined,
+        minWidth: iconOnly ? (compact ? 34 : 38) : (compact ? 118 : 138),
+        paddingInline: iconOnly ? 0 : undefined,
         fontWeight: 700,
-        borderRadius: 12,
+        borderRadius: iconOnly ? 999 : 12,
         background: isLiked ? 'var(--accent)' : 'var(--surface-elevated)',
         borderColor: 'var(--accent)',
         color: isLiked ? '#ffffff' : 'var(--accent)',
         boxShadow: isLiked ? '0 10px 24px rgba(24, 144, 255, 0.18)' : '0 8px 18px rgba(15, 23, 42, 0.06)',
       }}
     >
-      {isLiked ? 'Харесано' : 'Харесай'}
+      {iconOnly ? null : (isLiked ? 'Харесано' : 'Харесай')}
     </Button>
   );
 };

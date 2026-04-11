@@ -13,6 +13,7 @@ import {
   type EventItem,
 } from '../../entities/events/model';
 import { $user } from '../../entities/model';
+import { $effectiveRegionId } from '../../entities/location/model';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -53,8 +54,9 @@ const Recommended: React.FC = () => {
   const [allEvents, setAllEvents] = useState<EventItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const { user, likedEventIds, loadAllEvents, loadLikedEventIds, resetLikedEvents } = useUnit({
+  const { user, effectiveRegionId, likedEventIds, loadAllEvents, loadLikedEventIds, resetLikedEvents } = useUnit({
     user: $user,
+    effectiveRegionId: $effectiveRegionId,
     likedEventIds: $likedEventIds,
     loadAllEvents: fetchAllEventsFx,
     loadLikedEventIds: fetchLikedEventIdsFx,
@@ -120,7 +122,7 @@ const Recommended: React.FC = () => {
         const reasonTags: string[] = [];
         let score = 1;
 
-        if (user?.regionId !== null && user?.regionId !== undefined && event.regionId === user.regionId) {
+        if (effectiveRegionId !== null && event.regionId === effectiveRegionId) {
           score += 4;
           reasonTags.push('В твоя регион');
         }
@@ -160,7 +162,7 @@ const Recommended: React.FC = () => {
 
         return left.event.startHour.localeCompare(right.event.startHour);
       });
-  }, [allEvents, likedEventIds, user?.regionId]);
+  }, [allEvents, effectiveRegionId, likedEventIds]);
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 24px', color: 'var(--text-primary)' }}>

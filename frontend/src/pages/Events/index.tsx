@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { Button, Card, Col, DatePicker, FloatButton, Input, message, Popconfirm, Row, Select, Space, Spin, Tag, Typography } from 'antd';
-import { ArrowRightOutlined, CalendarOutlined, CloseCircleOutlined, DeleteOutlined, DownCircleOutlined, EditOutlined, EnvironmentOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { ArrowRightOutlined, CalendarOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, DownCircleOutlined, EditOutlined, EnvironmentOutlined, FireOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useUnit } from 'effector-react';
 import { Link } from 'atomic-router-react';
 import EventLikeButton from '../../components/EventLikeButton';
+import GoogleCalendarButton from '../../components/GoogleCalendarButton';
+import ShareEventButton from '../../components/ShareEventButton';
 import EventEditorModal from '../../components/EventEditorModal';
 import {
   $categoryOptions,
@@ -33,11 +35,57 @@ import {
   $isSpecialUser,
   $user,
 } from '../../entities/model';
+import { $effectiveRegionId } from '../../entities/location/model';
 import { supabase } from '../../services/supabaseClient';
 import { routes } from '../../shared/routing';
 
 const { Title, Paragraph } = Typography;
-const { Search } = Input;
+
+type EventSortMode = 'newest' | 'nearest' | 'liked' | 'latest';
+
+const sortModeLabels: Record<EventSortMode, string> = {
+  newest: 'Най-скорошни',
+  nearest: 'Най-близки до теб',
+  liked: 'Най-харесвани',
+  latest: 'Най-скоро добавени',
+};
+
+const sortModeIcons: Record<EventSortMode, React.ReactNode> = {
+  newest: <ClockCircleOutlined />,
+  nearest: <EnvironmentOutlined />,
+  liked: <FireOutlined />,
+  latest: <PlusOutlined />,
+};
+
+const compareUpcomingEvents = (leftEvent: EventItem, rightEvent: EventItem) => {
+  const dateCompare = leftEvent.startDate.localeCompare(rightEvent.startDate);
+
+  if (dateCompare !== 0) {
+    return dateCompare;
+  }
+
+  const hourCompare = leftEvent.startHour.localeCompare(rightEvent.startHour);
+
+  if (hourCompare !== 0) {
+    return hourCompare;
+  }
+
+  return Number(leftEvent.id) - Number(rightEvent.id);
+};
+
+const compareLatestAddedEvents = (leftEvent: EventItem, rightEvent: EventItem) => Number(rightEvent.id) - Number(leftEvent.id);
+
+const isPastEvent = (event: EventItem, today: dayjs.Dayjs) => dayjs(event.endDate).isBefore(today, 'day');
+
+const getNewestSortDate = (event: EventItem, today: dayjs.Dayjs) => {
+  const startDate = dayjs(event.startDate);
+
+  if (startDate.isBefore(today, 'day')) {
+    return today;
+  }
+
+  return startDate.startOf('day');
+};
 
 type FilterSelectProps = {
   placeholder: string;
@@ -102,18 +150,25 @@ const FilterSelect: React.FC<FilterSelectProps> = ({ placeholder, value, options
   );
 };
 
+type EventLikeCountRow = {
+  id_event: number;
+};
+
 const Events: React.FC = () => {
   const [messageApi, contextHolder] = message.useMessage();
   const [hasRequested, setHasRequested] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<EventSortMode>('newest');
+  const [eventLikeCounts, setEventLikeCounts] = useState<Record<string, number>>({});
   const {
     events,
     isLoading,
     isAdmin,
     isSpecialUser,
     user,
+    effectiveRegionId,
     searchText,
     selectedRegionId,
     selectedCategoryId,
@@ -136,6 +191,7 @@ const Events: React.FC = () => {
     isAdmin: $isAdmin,
     isSpecialUser: $isSpecialUser,
     user: $user,
+    effectiveRegionId: $effectiveRegionId,
     searchText: $searchText,
     selectedRegionId: $selectedRegionId,
     selectedCategoryId: $selectedCategoryId,
@@ -215,12 +271,132 @@ const Events: React.FC = () => {
     openPage();
   }, [openPage]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncLikeCounts = async () => {
+      if (events.length === 0) {
+        setEventLikeCounts({});
+        return;
+      }
+
+      const eventIds = events
+        .map((event) => Number(event.id))
+        .filter((eventId) => !Number.isNaN(eventId));
+
+      if (eventIds.length === 0) {
+        setEventLikeCounts({});
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('event_likes')
+        .select('id_event')
+        .in('id_event', eventIds);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (error) {
+        setEventLikeCounts({});
+        return;
+      }
+
+      const nextCounts = ((data ?? []) as EventLikeCountRow[]).reduce<Record<string, number>>((counts, row) => {
+        const eventId = String(row.id_event);
+        counts[eventId] = (counts[eventId] ?? 0) + 1;
+        return counts;
+      }, {});
+
+      setEventLikeCounts(nextCounts);
+    };
+
+    void syncLikeCounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [events]);
+
   const clearFilters = () => {
     onSearch('');
     onRegionChange(null);
     onCategoryChange(null);
     onDateChange(null);
+    setSortMode('newest');
   };
+
+  const sortedEvents = useMemo(() => {
+    const nextEvents = [...events];
+    const today = dayjs().startOf('day');
+
+    if (sortMode === 'nearest') {
+      return nextEvents.sort((leftEvent, rightEvent) => {
+        const leftDistance = effectiveRegionId !== null && leftEvent.regionId === effectiveRegionId ? 0 : 1;
+        const rightDistance = effectiveRegionId !== null && rightEvent.regionId === effectiveRegionId ? 0 : 1;
+
+        if (leftDistance !== rightDistance) {
+          return leftDistance - rightDistance;
+        }
+
+        return compareUpcomingEvents(leftEvent, rightEvent);
+      });
+    }
+
+    if (sortMode === 'liked') {
+      return nextEvents.sort((leftEvent, rightEvent) => {
+        const leftLikes = eventLikeCounts[leftEvent.id] ?? 0;
+        const rightLikes = eventLikeCounts[rightEvent.id] ?? 0;
+
+        if (leftLikes !== rightLikes) {
+          return rightLikes - leftLikes;
+        }
+
+        return compareUpcomingEvents(leftEvent, rightEvent);
+      });
+    }
+
+    if (sortMode === 'latest') {
+      return nextEvents.sort((leftEvent, rightEvent) => {
+        const idCompare = compareLatestAddedEvents(leftEvent, rightEvent);
+
+        if (idCompare !== 0) {
+          return idCompare;
+        }
+
+        return compareUpcomingEvents(leftEvent, rightEvent);
+      });
+    }
+
+    return nextEvents
+      .filter((event) => !isPastEvent(event, today))
+      .sort((leftEvent, rightEvent) => {
+        const leftDate = getNewestSortDate(leftEvent, today);
+        const rightDate = getNewestSortDate(rightEvent, today);
+
+        const dateCompare = leftDate.valueOf() - rightDate.valueOf();
+
+        if (dateCompare !== 0) {
+          return dateCompare;
+        }
+
+        const leftEndDate = dayjs(leftEvent.endDate).valueOf();
+        const rightEndDate = dayjs(rightEvent.endDate).valueOf();
+
+        if (leftEndDate !== rightEndDate) {
+          return leftEndDate - rightEndDate;
+        }
+
+        const hourCompare = leftEvent.startHour.localeCompare(rightEvent.startHour);
+
+        if (hourCompare !== 0) {
+          return hourCompare;
+        }
+
+        return Number(leftEvent.id) - Number(rightEvent.id);
+      });
+  }, [effectiveRegionId, eventLikeCounts, events, sortMode]);
 
   const closeEditor = () => {
     setIsEditorOpen(false);
@@ -313,15 +489,25 @@ const Events: React.FC = () => {
             </div>
 
             <div className="events-filter-group">
-              <Search
-                placeholder="Търси по име, изпълнител или описание..."
-                allowClear
-                enterButton={<SearchOutlined />}
-                size="large"
-                value={searchText}
-                onSearch={onSearch}
-                onChange={(event) => onSearch(event.target.value)}
-              />
+              <div className="events-search-row">
+                <Input
+                  placeholder="Търси по име, изпълнител или описание..."
+                  allowClear
+                  size="large"
+                  value={searchText}
+                  onChange={(event) => onSearch(event.target.value)}
+                  onPressEnter={() => onSearch(searchText)}
+                />
+                <Button
+                  className="events-search-button"
+                  type="primary"
+                  size="small"
+                  shape="circle"
+                  icon={<SearchOutlined />}
+                  aria-label="Търси"
+                  onClick={() => onSearch(searchText)}
+                />
+              </div>
             </div>
 
             <div className="events-filter-group">
@@ -354,6 +540,25 @@ const Events: React.FC = () => {
               />
             </div>
 
+            <div className="events-filter-group events-sort-group">
+              <div className="events-sort-title">Сортиране</div>
+              <div className="events-sort-list">
+                {(Object.keys(sortModeLabels) as EventSortMode[]).map((mode) => (
+                  <Button
+                    key={mode}
+                    className="events-sort-button"
+                    type={sortMode === mode ? 'primary' : 'default'}
+                    size="large"
+                    icon={sortModeIcons[mode]}
+                    block
+                    onClick={() => setSortMode(mode)}
+                  >
+                    {sortModeLabels[mode]}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             <div className="events-filter-group">
               <Button onClick={clearFilters}>Изчисти филтрите</Button>
             </div>
@@ -379,9 +584,9 @@ const Events: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'center', padding: '96px 0' }}>
                 <Spin size="large" tip="Зареждане на събития..." />
               </div>
-            ) : events.length > 0 ? (
+            ) : sortedEvents.length > 0 ? (
               <Row gutter={[24, 24]}>
-                {events.map((event) => {
+                {sortedEvents.map((event) => {
                   const canManageEvent = isAdmin || (isSpecialUser && currentUserId === event.ownerId);
 
                   return (
@@ -419,7 +624,11 @@ const Events: React.FC = () => {
                             </Button>
                           </Link>
 
-                          <EventLikeButton eventId={event.id} compact />
+                          <GoogleCalendarButton event={event} compact iconOnly />
+
+                          <ShareEventButton event={event} compact iconOnly />
+
+                          <EventLikeButton eventId={event.id} compact iconOnly />
                         </div>
 
                         {canManageEvent ? (

@@ -5,6 +5,8 @@ import { Link } from 'atomic-router-react';
 import { routes } from '../shared/routing';
 import type { EventItem } from '../entities/events/model';
 import EventLikeButton from './EventLikeButton';
+import GoogleCalendarButton from './GoogleCalendarButton';
+import ShareEventButton from './ShareEventButton';
 
 const { Title, Paragraph } = Typography;
 
@@ -60,7 +62,11 @@ const EventSpotlightCard: React.FC<EventSpotlightCardProps> = ({ event, reasonTa
           <Button type="default" icon={<ArrowRightOutlined />}>Виж повече</Button>
         </Link>
 
-        <EventLikeButton eventId={event.id} compact />
+        <GoogleCalendarButton event={event} compact iconOnly />
+
+        <ShareEventButton event={event} compact iconOnly />
+
+        <EventLikeButton eventId={event.id} compact iconOnly />
       </Space>
     </Card>
   );
