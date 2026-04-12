@@ -1,5 +1,5 @@
 import { combine, createEffect, createEvent, createStore, sample } from 'effector';
-import { supabase } from '../../services/supabaseClient';
+import { publicSupabase, supabase } from '../../services/supabaseClient';
 
 export type EventItem = {
   id: string;
@@ -161,7 +161,7 @@ const normalizeFilters = (filters: EventFilters) => ({
 });
 
 const loadEventRows = async (filters: EventFilters): Promise<EventItem[]> => {
-  const { data, error } = await supabase.rpc('search_events', normalizeFilters(filters));
+  const { data, error } = await publicSupabase.rpc('search_events', normalizeFilters(filters));
 
   if (error) {
     throw error;
@@ -177,7 +177,7 @@ const loadEventRowById = async (eventId: string): Promise<EventItem | null> => {
     return null;
   }
 
-  const { data, error } = await supabase.rpc('get_event_by_id', {
+  const { data, error } = await publicSupabase.rpc('get_event_by_id', {
     p_event_id: numericId,
   });
 
@@ -333,7 +333,7 @@ export const deleteEventFx = createEffect(async (eventId: string): Promise<strin
   return eventId;
 });
 export const fetchRegionsFx = createEffect(async (): Promise<FilterOption[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await publicSupabase
     .from('regions')
     .select('id_region, region')
     .order('id_region', { ascending: true });
@@ -348,7 +348,7 @@ export const fetchRegionsFx = createEffect(async (): Promise<FilterOption[]> => 
   }));
 });
 export const fetchCategoriesFx = createEffect(async (): Promise<FilterOption[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await publicSupabase
     .from('event_category')
     .select('id_event_category, name_event_category')
     .order('id_event_category', { ascending: true });
