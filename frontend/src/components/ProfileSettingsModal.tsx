@@ -60,7 +60,15 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
         .eq('id_user', Number(user.id));
 
       if (error) {
-        throw error;
+        console.warn('Failed to load profile preferences.', error);
+
+        form.setFieldsValue({
+          name: user.name,
+          email: user.email,
+          categoryIds: [],
+        });
+
+        return;
       }
 
       const selectedCategoryIds = (data ?? []).map((row) => String(row.id_event_category));
