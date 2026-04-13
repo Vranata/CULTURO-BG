@@ -51,6 +51,12 @@ const buildInviteAliasEmail = (email: string) => {
   return `${localPart}+upgrade-request-${uniqueSuffix}@${domainPart}`;
 };
 
+const collectNotificationRecipients = (email: string) => {
+  const recipients = [email, buildInviteAliasEmail(email)];
+
+  return recipients.filter((recipient, index) => recipients.indexOf(recipient) === index);
+};
+
 Deno.serve(async (request: Request) => {
   try {
     if (request.method === 'OPTIONS') {
@@ -100,21 +106,27 @@ Deno.serve(async (request: Request) => {
       },
     });
 
-    const inviteAliasEmail = buildInviteAliasEmail(adminEmail);
+    const redirectTo = request.headers.get('origin') ? `${request.headers.get('origin')}/login` : undefined;
+    const notificationRecipients = collectNotificationRecipients(adminEmail);
+    let lastInviteError: Error | null = null;
 
-    const { error: inviteError } = await adminSupabase.auth.admin.inviteUserByEmail(inviteAliasEmail, {
-      data: inviteMetadata,
-      redirectTo: request.headers.get('origin') ? `${request.headers.get('origin')}/login` : undefined,
-    });
-
-    if (inviteError) {
-      return jsonResponse(502, {
-        error: 'Failed to send upgrade request email.',
-        details: inviteError.message,
+    for (const recipientEmail of notificationRecipients) {
+      const { error: inviteError } = await adminSupabase.auth.admin.inviteUserByEmail(recipientEmail, {
+        data: inviteMetadata,
+        redirectTo,
       });
+
+      if (!inviteError) {
+        return jsonResponse(200, { ok: true });
+      }
+
+      lastInviteError = new Error(inviteError.message);
     }
 
-    return jsonResponse(200, { ok: true });
+    return jsonResponse(502, {
+      error: 'Failed to send upgrade request email.',
+      details: lastInviteError?.message ?? 'Unknown invite error.',
+    });
   } catch (error) {
     const details = error instanceof Error ? error.message : String(error);
     return jsonResponse(500, {

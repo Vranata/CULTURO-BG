@@ -61,7 +61,7 @@ Notes
 
 ## Upgrade Request Admin Email
 
-This is sent by the edge function through Supabase Auth's invite flow to a plus-alias inbox that lands in the admin mailbox.
+This is sent by the edge function through Supabase Auth's invite flow. It tries the real `culturobg@gmail.com` inbox first and falls back to a plus-alias that still lands in the same mailbox.
 
 Subject
 ```text
@@ -85,5 +85,5 @@ HTML body
 
 Notes
 - Keep `SERVICE_ROLE_KEY` as a Supabase secret.
-- The edge function generates a unique plus-alias per request, for example `culturobg+upgrade-request-1700000000000-ab12cd34@gmail.com`, which still delivers to the `culturobg@gmail.com` inbox but avoids existing-user collisions.
+- The edge function first tries `culturobg@gmail.com` directly. If Supabase refuses that invite because the user already exists, it falls back to a unique plus-alias per request, for example `culturobg+upgrade-request-1700000000000-ab12cd34@gmail.com`, which still delivers to the `culturobg@gmail.com` inbox but avoids existing-user collisions.
 - If you want the subject or body copy changed later, update `supabase/functions/send-upgrade-request/index.ts` and keep this doc in sync.
