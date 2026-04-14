@@ -1,16 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Route, Link } from 'atomic-router-react';
 import { useUnit } from 'effector-react';
-import { Button, ConfigProvider, Layout, Tooltip, theme as antdTheme } from 'antd';
-import { 
-  BgColorsOutlined, 
-  CalendarOutlined, 
-  HeartOutlined, 
-  HomeOutlined, 
-  LoginOutlined, 
-  LogoutOutlined, 
-  MoonOutlined, 
-  StarOutlined, 
+import { Button, ConfigProvider, Drawer, FloatButton, Layout, Tooltip, theme as antdTheme } from 'antd';
+import {
+  BgColorsOutlined,
+  CalendarOutlined,
+  HeartOutlined,
+  HomeOutlined,
+  LoginOutlined,
+  LogoutOutlined,
+  MenuOutlined,
+  MoonOutlined,
+  StarOutlined,
   SunOutlined,
   UserOutlined
 } from '@ant-design/icons';
@@ -106,7 +107,8 @@ const getThemeConfig = (mode: ThemeMode) => {
 const App: React.FC = () => {
   const [themeMode, setThemeMode] = useState<ThemeMode>('light');
   const [selectedKey, setSelectedKey] = useState(() => getRouteKey(typeof window !== 'undefined' ? window.location.pathname : '/'));
-  
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+
   const { isAuthenticated, signOut, user, isAdmin } = useUnit({
     isAuthenticated: $isAuthenticated,
     user: $user,
@@ -155,7 +157,7 @@ const App: React.FC = () => {
   }, [isAdmin]);
 
   const themeConfig = useMemo(() => getThemeConfig(themeMode), [themeMode]);
-  
+
   const cycleTheme = () => {
     const nextIndex = (themeOrder.indexOf(themeMode) + 1) % themeOrder.length;
     setThemeMode(themeOrder[nextIndex]);
@@ -212,6 +214,18 @@ const App: React.FC = () => {
           <div className="header-navigation-shell">
             <SidebarNavigation themeMode={themeMode} selectedKey={selectedKey} items={activeNavigationItems} compact />
           </div>
+
+          <Button
+            className="mobile-menu-button"
+            type="text"
+            icon={<MenuOutlined />}
+            onClick={() => setIsMobileDrawerOpen(true)}
+            style={{
+              display: 'none',
+              color: 'var(--header-text)',
+              fontSize: '20px',
+            }}
+          />
 
           <div style={{ flex: 1 }} />
 
@@ -300,6 +314,27 @@ const App: React.FC = () => {
           <div style={{ marginBottom: '12px', color: 'var(--header-text)' }}>CULTURO BG</div>
           ©{new Date().getFullYear()} Created for Diploma Project • Итеративен модел на разработка
         </Footer>
+
+        <Drawer
+          title="Меню"
+          placement="left"
+          onClose={() => setIsMobileDrawerOpen(false)}
+          open={isMobileDrawerOpen}
+          styles={{ body: { padding: 0, background: 'var(--header-bg)' }, header: { background: 'var(--header-bg)', borderBottom: '1px solid var(--border-color)' } }}
+          headerStyle={{ color: 'var(--header-text)' }}
+          width={280}
+        >
+          <div style={{ padding: '24px 16px' }} onClick={() => setIsMobileDrawerOpen(false)}>
+            <SidebarNavigation themeMode={themeMode} selectedKey={selectedKey} items={activeNavigationItems} />
+          </div>
+        </Drawer>
+
+        {selectedKey !== 'home' && (
+          <FloatButton.BackTop
+            visibilityHeight={400}
+            style={{ right: 24, bottom: 24 }}
+          />
+        )}
       </Layout>
     </ConfigProvider>
   );

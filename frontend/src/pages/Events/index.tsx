@@ -669,7 +669,6 @@ const Events: React.FC = () => {
         </div>
       </div>
 
-      <FloatButton.BackTop visibilityHeight={300} className="events-back-to-top" />
 
       <EventEditorModal
         open={isEditorOpen}
