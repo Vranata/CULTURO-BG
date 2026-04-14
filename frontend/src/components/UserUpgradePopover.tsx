@@ -255,8 +255,7 @@ const UserUpgradePopover: React.FC<{ user: AppUser }> = ({ user }) => {
       >
         <Button
           type="text"
-          onClick={handleOpenSettings}
-          aria-label="Отвори профилни настройки"
+          aria-label="Настройки на профила (преглед при ховър)"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -272,7 +271,7 @@ const UserUpgradePopover: React.FC<{ user: AppUser }> = ({ user }) => {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            cursor: 'pointer',
+            cursor: 'default',
           }}
         >
           {user.email}
