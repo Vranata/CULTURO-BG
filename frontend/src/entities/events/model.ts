@@ -1,5 +1,9 @@
 import { combine, createEffect, createEvent, createStore, sample } from 'effector';
+import dayjs from 'dayjs';
+import 'dayjs/locale/bg';
 import { publicSupabase, supabase } from '../../services/supabaseClient';
+
+dayjs.locale('bg');
 
 export type EventItem = {
   id: string;
@@ -107,13 +111,9 @@ const sortEvents = (events: EventItem[]) => [...events].sort((leftEvent, rightEv
 });
 
 const formatDate = (value: string) => {
-  const parsedDate = new Date(value);
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return value;
-  }
-
-  return parsedDate.toLocaleDateString('bg-BG');
+  const d = dayjs(value);
+  if (!d.isValid()) return value;
+  return d.format('D MMMM YYYY г.');
 };
 
 const categoryFallbackImages: Record<number, string> = {
@@ -124,24 +124,29 @@ const categoryFallbackImages: Record<number, string> = {
   5: 'https://pojinfknlfocjttxirpb.supabase.co/storage/v1/object/public/event-images/sports.png',
 };
 
-const mapEventRow = (row: SupabaseEventRow): EventItem => ({
-  id: String(row.id_event),
-  title: row.name_event,
-  artist: row.name_artist,
-  place: row.place_event,
-  description: row.description,
-  regionId: row.id_region,
-  region: row.region,
-  startDate: row.start_date,
-  date: formatDate(row.start_date),
-  image: row.picture || categoryFallbackImages[row.id_event_category] || fallbackImage,
-  categoryId: row.id_event_category,
-  category: row.category,
-  startHour: row.start_hour,
-  endDate: row.end_date,
-  endHour: row.end_hour,
-  ownerId: String(row.id_user),
-});
+const mapEventRow = (row: SupabaseEventRow): EventItem => {
+  // Treat the old unsplash fallback as "no image" so we use the new category fallbacks
+  const hasValidPicture = row.picture && row.picture !== fallbackImage && row.picture.trim() !== '';
+  
+  return {
+    id: String(row.id_event),
+    title: row.name_event,
+    artist: row.name_artist,
+    place: row.place_event,
+    description: row.description,
+    regionId: row.id_region,
+    region: row.region,
+    startDate: row.start_date,
+    date: formatDate(row.start_date),
+    image: hasValidPicture ? row.picture! : (categoryFallbackImages[row.id_event_category] || fallbackImage),
+    categoryId: row.id_event_category,
+    category: row.category,
+    startHour: row.start_hour,
+    endDate: row.end_date,
+    endHour: row.end_hour,
+    ownerId: String(row.id_user),
+  };
+};
 
 const buildEventPayload = (values: EventMutationValues) => ({
   name_event: values.name.trim(),

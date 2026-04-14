@@ -158,13 +158,13 @@ const EventDetails: React.FC = () => {
               <div>
                 <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Начало:</Text>
                 <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                  {dayjs(currentEvent.startDate).format('D MMMM')} г., {currentEvent.startHour.substring(0, 5)} ч.
+                  {dayjs(currentEvent.startDate).format('D MMMM YYYY')} г., {currentEvent.startHour.substring(0, 5)} ч.
                 </Text>
               </div>
               <div>
                 <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Край:</Text>
                 <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                  {dayjs(currentEvent.endDate).format('D MMMM')} г., {currentEvent.endHour.substring(0, 5)} ч.
+                  {dayjs(currentEvent.endDate).format('D MMMM YYYY')} г., {currentEvent.endHour.substring(0, 5)} ч.
                 </Text>
               </div>
 
