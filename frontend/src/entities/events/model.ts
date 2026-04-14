@@ -92,7 +92,7 @@ type EventLikeRow = {
   id_event: number;
 };
 
-const fallbackImage = 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80';
+const fallbackImage = '/images/defaults/branded-default.png';
 
 const sortEvents = (events: EventItem[]) => [...events].sort((leftEvent, rightEvent) => {
   const dateCompare = leftEvent.startDate.localeCompare(rightEvent.startDate);
@@ -116,12 +116,20 @@ const formatDate = (value: string) => {
   return d.format('D MMMM YYYY г.');
 };
 
-const categoryFallbackImages: Record<number, string> = {
-  1: 'https://pojinfknlfocjttxirpb.supabase.co/storage/v1/object/public/events/1_2.jpg',
-  2: 'https://pojinfknlfocjttxirpb.supabase.co/storage/v1/object/public/events/2_3.jpg',
-  3: 'https://pojinfknlfocjttxirpb.supabase.co/storage/v1/object/public/events/4_5.jpg',
-  4: 'https://pojinfknlfocjttxirpb.supabase.co/storage/v1/object/public/events/3_4.jpg',
-  5: 'https://pojinfknlfocjttxirpb.supabase.co/storage/v1/object/public/events/5_2.jpg',
+const getCategoryDefaultImage = (categoryId: number): string => {
+  const music = [10, 11, 12, 13, 14, 33, 34];
+  const stage = [16, 17, 18, 30, 37];
+  const cinema = [40];
+  const sports = [20];
+  const festivals = [15, 35, 50];
+
+  if (music.includes(categoryId)) return '/images/defaults/concert-default.png';
+  if (stage.includes(categoryId)) return '/images/defaults/theater-default.png';
+  if (cinema.includes(categoryId)) return '/images/defaults/cinema-default.png';
+  if (sports.includes(categoryId)) return '/images/defaults/sports-default.png';
+  if (festivals.includes(categoryId)) return '/images/defaults/festival-default.png';
+
+  return fallbackImage;
 };
 
 const mapEventRow = (row: SupabaseEventRow): EventItem => {
@@ -139,7 +147,7 @@ const mapEventRow = (row: SupabaseEventRow): EventItem => {
     region: row.region,
     startDate: row.start_date,
     date: formatDate(row.start_date),
-    image: hasValidPicture ? row.picture! : (categoryFallbackImages[row.id_event_category] || fallbackImage),
+    image: hasValidPicture ? row.picture! : getCategoryDefaultImage(row.id_event_category),
     categoryId: row.id_event_category,
     category: row.category,
     startHour: row.start_hour,
