@@ -14,6 +14,7 @@ import EventDetails from './pages/EventDetails/index';
 import Favorites from './pages/Favorites/index';
 import Login from './pages/Login/index';
 import Recommended from './pages/Recommended/index';
+import AdminMessage from './pages/AdminMessage/index';
 import LocationInitializer from './components/LocationInitializer';
 
 const { Header, Content, Footer } = Layout;
@@ -242,6 +243,7 @@ const App: React.FC = () => {
               <Route route={routes.favorites} view={Favorites} />
               <Route route={routes.eventDetails} view={EventDetails} />
               <Route route={routes.login} view={Login} />
+              <Route route={routes.adminMessage} view={AdminMessage} />
             </div>
           </Content>
         </Layout>

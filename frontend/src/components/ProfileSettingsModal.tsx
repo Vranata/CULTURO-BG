@@ -53,33 +53,20 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   const availableCategories = useMemo(() => (categoryOptions.length > 0 ? categoryOptions : fallbackCategoryOptions), [categoryOptions]);
 
   const resolveCurrentUserDbId = async (retries = 2): Promise<number | null> => {
-    console.log('[Preferences] resolveCurrentUserDbId: querying for auth_user_id =', user.authUserId);
     const { data, error } = await supabase
       .from('users')
       .select('id_user')
       .eq('auth_user_id', user.authUserId)
       .maybeSingle<UserRowId>();
 
-    if (error) {
-      console.error('[Preferences] resolveCurrentUserDbId: query error', error);
-      throw error;
-    }
+    if (error) throw error;
+    if (data?.id_user) return data.id_user;
 
-    if (data?.id_user) {
-      console.log('[Preferences] resolveCurrentUserDbId: found id_user =', data.id_user);
-      return data.id_user;
-    }
-
-    // Auth session may not be fully established yet (RLS blocks SELECT when auth.uid() is null).
-    // Retry after a short delay before giving up.
     if (retries > 0) {
-      console.warn('[Preferences] resolveCurrentUserDbId: user row not found, retrying in 500ms...', retries, 'retries left');
       await new Promise((resolve) => setTimeout(resolve, 500));
       return resolveCurrentUserDbId(retries - 1);
     }
 
-    // Last resort: upsert only if user genuinely doesn't exist (no destructive field overwrite)
-    console.warn('[Preferences] resolveCurrentUserDbId: user row not found after retries, attempting upsert...');
     const { data: upsertData, error: upsertError } = await supabase.from('users').upsert({
       auth_user_id: user.authUserId,
       email: user.email,
@@ -90,73 +77,45 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       profile_onboarding_completed: false
     }, { onConflict: 'auth_user_id', ignoreDuplicates: false }).select('id_user').single();
 
-    if (upsertError) {
-      console.error('[Preferences] resolveCurrentUserDbId: upsert failed', upsertError);
-      return null;
-    }
-
-    console.log('[Preferences] resolveCurrentUserDbId: upsert created id_user =', upsertData?.id_user);
+    if (upsertError) return null;
     return upsertData?.id_user ?? null;
   };
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    console.log('[Preferences] Modal opened, loading preferences...', {
-      categoriesCount: availableCategories.length,
-      authUserId: user.authUserId
-    });
+    if (!open) return;
 
     const loadProfilePreferences = async () => {
       // Small delay to ensure the form is fully connected
       await new Promise((resolve) => setTimeout(resolve, 100));
-
       const currentUserDbId = await resolveCurrentUserDbId();
 
       if (currentUserDbId === null) {
-        console.warn('[Preferences] No user DB id found, setting default values');
-        form.setFieldsValue({
-          name: user.name,
-          email: user.email,
-          categoryIds: [],
-        });
+        form.setFieldsValue({ name: user.name, email: user.email, categoryIds: [] });
         return;
       }
 
-      console.log('[Preferences] Querying user_likings for id_user =', currentUserDbId);
       const { data, error } = await supabase
         .from('user_likings')
         .select('id_event_category')
         .eq('id_user', currentUserDbId);
 
       if (error) {
-        console.error('[Preferences] Failed to load preferences:', error);
-        form.setFieldsValue({
-          name: user.name,
-          email: user.email,
-          categoryIds: [],
-        });
+        form.setFieldsValue({ name: user.name, email: user.email, categoryIds: [] });
         return;
       }
 
       const selectedCategoryIds = (data ?? []).map((row) => String(row.id_event_category));
-      console.log('[Preferences] Loaded categories from DB:', selectedCategoryIds);
-
-      // Force a re-render/re-sync by ensuring we have categories loaded
       form.setFieldsValue({
         name: user.name,
         email: user.email,
         categoryIds: selectedCategoryIds,
       });
-
-      console.log('[Preferences] Form fields set.');
+      console.log('[Preferences] User preferences loaded.');
     };
 
     void loadProfilePreferences().catch((error) => {
-      console.error('[Preferences] Error in loadProfilePreferences:', error);
-      message.error(error instanceof Error ? error.message : 'Неуспешно зареждане на профила.');
+      console.error('[Preferences] Error:', error);
+      message.error('Грешка при зареждане на профила.');
     });
 
     setIsEmailChangeVisible(false);
@@ -167,343 +126,165 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
 
   const persistCategoryPreferences = async (categoryIds: string[]) => {
     const currentUserDbId = await resolveCurrentUserDbId();
+    if (currentUserDbId === null) return;
 
-    if (currentUserDbId === null) {
-      console.error('[Preferences] Cannot persist: no user DB id');
-      return;
-    }
+    await supabase.from('user_likings').delete().eq('id_user', currentUserDbId);
+    if (categoryIds.length === 0) return;
 
-    console.log('[Preferences] Deleting old likings for id_user =', currentUserDbId);
-    const deleteResult = await supabase.from('user_likings').delete().eq('id_user', currentUserDbId);
-
-    if (deleteResult.error) {
-      console.error('[Preferences] Delete failed:', deleteResult.error);
-      throw deleteResult.error;
-    }
-
-    if (categoryIds.length === 0) {
-      console.log('[Preferences] No categories to insert, done.');
-      return;
-    }
-
-    console.log('[Preferences] Inserting new likings:', categoryIds);
-    const insertResult = await supabase.from('user_likings').insert(
+    await supabase.from('user_likings').insert(
       categoryIds.map((categoryId) => ({
         id_user: currentUserDbId,
         id_event_category: Number(categoryId),
       }))
     );
-
-    if (insertResult.error) {
-      console.error('[Preferences] Insert failed:', insertResult.error);
-      throw insertResult.error;
-    }
-    console.log('[Preferences] Preferences saved successfully!');
   };
 
-  const markOnboardingCompleted = async () => {
-    const updateWithFlag = await supabase
-      .from('users')
-      .update({ profile_onboarding_completed: true })
-      .eq('auth_user_id', user.authUserId);
-
-    if (updateWithFlag.error && !isMissingOnboardingColumnError(updateWithFlag.error)) {
-      throw updateWithFlag.error;
-    }
-
-    setLocalOnboardingCompletion(user.authUserId);
-  };
-
-  const finishAndRefresh = async (successMessage: string, preferenceChanged: boolean) => {
-    message.success(successMessage);
-
-    if (preferenceChanged) {
-      window.dispatchEvent(new Event('culturo-preferences-updated'));
-    }
-
-    refreshUserProfile();
-    onCompleted();
-    onClose();
-  };
-
-  const handleSkip = async () => {
+  const handleSave = async (values: ProfileSettingsValues) => {
     setIsSaving(true);
-
     try {
-      await markOnboardingCompleted();
-      await finishAndRefresh('Анкетата е пропусната.', false);
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : 'Неуспешно пропускане на анкетата.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+      // 1. Persist categories
+      await persistCategoryPreferences(values.categoryIds);
 
-  const persistProfileBasics = async (nextName: string) => {
-    const profileUpdate = await supabase
-      .from('users')
-      .update({
-        name_user: nextName,
-      })
-      .eq('auth_user_id', user.authUserId);
-
-    if (profileUpdate.error) {
-      throw profileUpdate.error;
-    }
-  };
-
-  const handleSubmit = async (values: ProfileSettingsValues) => {
-    setIsSaving(true);
-
-    try {
-      const categoryIds = Array.from(new Set(values.categoryIds));
-      const nextName = mode === 'profile' ? (values.name ?? user.name).trim() : user.name;
-
-      if (mode === 'profile') {
-        if (nextName !== user.name) {
-          await updateAccount({
-            data: {
-              full_name: nextName,
-              name: nextName,
-            },
-          });
-        }
-
-        const profileUpdate = await supabase
-          .from('users')
-          .update({
-            name_user: nextName,
-            profile_onboarding_completed: true,
-          })
-          .eq('auth_user_id', user.authUserId);
-
-        if (profileUpdate.error && isMissingOnboardingColumnError(profileUpdate.error)) {
-          await persistProfileBasics(nextName);
-        } else if (profileUpdate.error) {
-          throw profileUpdate.error;
-        }
-
-        setLocalOnboardingCompletion(user.authUserId);
+      // 2. Update basic info (name/email if needed)
+      // Note: email change requires confirmation so we handle it separately if desired
+      if (values.name !== user.name) {
+        const { error } = await updateAccount({ full_name: values.name });
+        if (error) throw error;
       }
 
-      await persistCategoryPreferences(categoryIds);
-
+      // 3. Mark onboarding as completed if in survey mode
       if (mode === 'survey') {
-        await markOnboardingCompleted();
+        const currentUserDbId = await resolveCurrentUserDbId();
+        if (currentUserDbId) {
+          await supabase.from('users').update({ profile_onboarding_completed: true }).eq('id_user', currentUserDbId);
+          setLocalOnboardingCompletion(true);
+        }
       }
 
-      await finishAndRefresh(
-        mode === 'profile'
-          ? 'Профилът и предпочитанията са обновени.'
-          : 'Предпочитанията са запазени.',
-        true
-      );
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : 'Неуспешно запазване на профила.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleEmailChangeConfirm = async () => {
-    try {
-      const values = await form.validateFields(['email']);
-      const nextEmail = String(values.email ?? '').trim();
-
-      if (nextEmail === user.email) {
-        message.info('Имейлът вече е този, който използваш.');
-        return;
-      }
-
-      setIsSendingEmailChange(true);
-
-      await updateAccount({
-        email: nextEmail,
-        data: {
-          full_name: user.name,
-          name: user.name,
-        },
-      });
-
-      message.success('Изпратихме потвърждение за смяната на имейла. Провери текущата си поща за следващата стъпка.');
-      setIsEmailChangeVisible(false);
-  form.setFieldsValue({ email: user.email });
+      message.success('Промените са запазени успешно!');
       refreshUserProfile();
       onCompleted();
-      onClose();
-    } catch (error) {
-      if (isValidationError(error)) {
-        return;
+    } catch (error: any) {
+      if (!isValidationError(error)) {
+        console.error('Save error:', error);
+        message.error(error.message || 'Грешка при записване.');
       }
-
-      message.error(error instanceof Error ? error.message : 'Неуспешно изпращане на потвърждение за смяна на имейл.');
     } finally {
-      setIsSendingEmailChange(false);
+      setIsSaving(false);
     }
   };
 
-  const handlePasswordResetRequest = async () => {
+  const handlePasswordReset = async () => {
+    setIsSendingPasswordReset(true);
     try {
-      if (typeof window === 'undefined') {
-        throw new Error('Неуспешно изпращане на линк за смяна на паролата.');
-      }
-
-      setIsSendingPasswordReset(true);
-
-      await resetPassword({
-        email: user.email,
-        redirectTo: `${window.location.origin}/login?mode=recovery`,
-      });
-
-      message.success('Изпратихме линк за смяна на паролата на текущия имейл.');
+      const { error } = await resetPassword(user.email);
+      if (error) throw error;
+      message.success('Линк за нулиране на паролата е изпратен на вашия имейл.');
       setIsPasswordChangeVisible(false);
-      onClose();
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : 'Неуспешно изпращане на линк за смяна на паролата.');
+    } catch (error: any) {
+      message.error(error.message || 'Грешка при изпращане на имейл.');
     } finally {
       setIsSendingPasswordReset(false);
     }
   };
 
-  const handleCancel = () => {
-    if (mode === 'survey') {
-      void handleSkip();
+  const handleEmailChangeRequest = async () => {
+    const newEmail = form.getFieldValue('email');
+    if (!newEmail || newEmail === user.email) {
+      message.warning('Моля въведете нов имейл адрес.');
       return;
     }
 
-    onClose();
-  };
-
-  const footer =
-    mode === 'survey' ? (
-      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-        <Button onClick={handleSkip} disabled={isSaving}>
-          Откажи
-        </Button>
-        <Button type="primary" onClick={() => form.submit()} loading={isSaving}>
-          Запази предпочитанията
-        </Button>
-      </Space>
-    ) : undefined;
-
-  const toggleEmailChange = () => {
-    setIsEmailChangeVisible((current) => {
-      const nextVisible = !current;
-
-      if (!nextVisible) {
-        form.setFieldsValue({ email: user.email });
-      }
-
-      return nextVisible;
-    });
-  };
-
-  const togglePasswordChange = () => {
-    setIsPasswordChangeVisible((current) => !current);
+    setIsSendingEmailChange(true);
+    try {
+      const { error } = await updateAccount({ email: newEmail });
+      if (error) throw error;
+      message.success('Заявката е изпратена. Моля проверете новия си имейл за потвърждение.');
+      setIsEmailChangeVisible(false);
+    } catch (error: any) {
+      message.error(error.message || 'Грешка при промяна на имейла.');
+    } finally {
+      setIsSendingEmailChange(false);
+    }
   };
 
   return (
     <Modal
+      title={mode === 'survey' ? 'Добре дошли в CULTURO BG' : 'Профил и настройки'}
       open={open}
-      title={mode === 'survey' ? 'Кратка анкета за интереси' : 'Профил и настройки'}
-      okText={mode === 'survey' ? 'Запази' : 'Запази промените'}
-      cancelText={mode === 'survey' ? 'Откажи' : 'Отказ'}
-      confirmLoading={isSaving}
+      onCancel={onClose}
+      footer={null}
+      width={600}
       destroyOnClose
-      width={720}
-      onCancel={handleCancel}
-      onOk={() => form.submit()}
-      footer={footer}
     >
-      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-        <Typography.Paragraph style={{ marginBottom: 0, color: 'var(--text-secondary)' }}>
-          {mode === 'survey'
-            ? 'Избери категории, ако искаш, за да направим първите препоръки по-точни. Можеш да пропуснеш тази стъпка.'
-            : 'Имейлът и паролата се отварят само при изрично желание. Всяка промяна има свой отделен бутон за потвърждение.'}
+      <div style={{ padding: '10px 0' }}>
+        <Typography.Paragraph type="secondary">
+          Имейлът и паролата се отварят само при изрично желание. Всяка промяна има свой отделен бутон за потвърждение.
         </Typography.Paragraph>
 
-        <Form<ProfileSettingsValues>
-          form={form}
-          layout="vertical"
-          requiredMark={false}
-          onFinish={handleSubmit}
-          initialValues={{
-            name: user.name,
-            email: user.email,
-            categoryIds: [],
-          }}
-        >
-          {mode === 'profile' && (
-            <>
-              <Form.Item label="Име" name="name" rules={[{ required: true, message: 'Въведи име.' }]}>
-                <Input placeholder="Име и фамилия" size="large" />
-              </Form.Item>
-
-              <Button type="dashed" block onClick={toggleEmailChange}>
-                {isEmailChangeVisible ? 'Скрий смяната на имейла' : 'Смени имейла'}
-              </Button>
-
-              {isEmailChangeVisible ? (
-                <Space orientation="vertical" size="small" style={{ width: '100%' }}>
-                  <Typography.Paragraph style={{ marginBottom: 0, color: 'var(--text-secondary)' }}>
-                    Желаете да смените имейла си? Ако не сте били вие, е добре да промените и данните си за вход.
-                  </Typography.Paragraph>
-
-                  <Form.Item
-                    label="Нов имейл"
-                    name="email"
-                    rules={[
-                      { required: true, message: 'Въведи имейл.' },
-                      { type: 'email', message: 'Въведи валиден имейл адрес.' },
-                    ]}
-                  >
-                    <Input placeholder="name@example.com" size="large" />
-                  </Form.Item>
-
-                  <Button type="primary" block onClick={handleEmailChangeConfirm} loading={isSendingEmailChange}>
-                    Изпрати потвърждение към текущия имейл
-                  </Button>
-                </Space>
-              ) : (
-                <div style={{ color: 'var(--text-secondary)' }}>Имейл: {user.email}</div>
-              )}
-
-              <Button type="dashed" block onClick={togglePasswordChange}>
-                {isPasswordChangeVisible ? 'Скрий смяната на паролата' : 'Смени паролата'}
-              </Button>
-
-              {isPasswordChangeVisible && (
-                <Space orientation="vertical" size="small" style={{ width: '100%' }}>
-                  <Typography.Paragraph style={{ marginBottom: 0, color: 'var(--text-secondary)' }}>
-                    Желаете да смените паролата си? Ако не сте били вие, е добре да промените и данните си за вход.
-                  </Typography.Paragraph>
-
-                  <Button type="primary" block onClick={handlePasswordResetRequest} loading={isSendingPasswordReset}>
-                    Изпрати линк за смяна на паролата
-                  </Button>
-                </Space>
-              )}
-            </>
-          )}
-
-          <Form.Item
-            label="Предпочитани категории"
-            name="categoryIds"
-          >
-            <Select
-              mode="multiple"
-              size="large"
-              placeholder="Избери категории, ако искаш"
-              options={availableCategories}
-              maxTagCount="responsive"
-            />
+        <Form form={form} layout="vertical" onFinish={handleSave} initialValues={{ name: user.name, email: user.email }}>
+          <Form.Item name="name" label="Име" rules={[{ required: true, message: 'Моля въведете име.' }]}>
+            <Input placeholder="Вашето име" />
           </Form.Item>
 
-          <Typography.Text type="secondary" style={{ display: 'block', marginTop: -8 }}>
+          {isEmailChangeVisible ? (
+            <Form.Item label="Нов имейл адрес" style={{ marginBottom: 24 }}>
+              <Space.Compact style={{ width: '100%' }}>
+                <Form.Item name="email" noStyle rules={[{ required: true, type: 'email', message: 'Моля въведете валиден имейл.' }]}>
+                  <Input placeholder="нов.имейл@example.com" />
+                </Form.Item>
+                <Button type="primary" onClick={handleEmailChangeRequest} loading={isSendingEmailChange}>
+                  Потвърди
+                </Button>
+                <Button onClick={() => setIsEmailChangeVisible(false)}>Отказ</Button>
+              </Space.Compact>
+            </Form.Item>
+          ) : (
+            <div style={{ marginBottom: 24 }}>
+              <Button type="dashed" block onClick={() => setIsEmailChangeVisible(true)}>
+                Смени имейла
+              </Button>
+              <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+                Имейл: {user.email}
+              </Typography.Text>
+            </div>
+          )}
+
+          {isPasswordChangeVisible ? (
+            <div style={{ marginBottom: 24, padding: '12px', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+              <Typography.Paragraph>Ще ви изпратим линк за нулиране на паролата на вашия имейл адрес.</Typography.Paragraph>
+              <Space>
+                <Button type="primary" onClick={handlePasswordReset} loading={isSendingPasswordReset}>
+                  Изпрати линк
+                </Button>
+                <Button onClick={() => setIsPasswordChangeVisible(false)}>Отказ</Button>
+              </Space>
+            </div>
+          ) : (
+            <div style={{ marginBottom: 24 }}>
+              <Button type="dashed" block onClick={() => setIsPasswordChangeVisible(true)}>
+                Смени паролата
+              </Button>
+            </div>
+          )}
+
+          <Form.Item name="categoryIds" label="Предпочитани категории">
+            <Select mode="multiple" placeholder="Изберете категории" style={{ width: '100%' }} options={availableCategories} />
+          </Form.Item>
+          <Typography.Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '24px' }}>
             Категориите не са задължителни. Можеш да оставиш полето празно.
           </Typography.Text>
+
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+            <Space>
+              <Button onClick={onClose}>Отказ</Button>
+              <Button type="primary" htmlType="submit" loading={isSaving}>
+                {mode === 'survey' ? 'Започни' : 'Запази промените'}
+              </Button>
+            </Space>
+          </Form.Item>
         </Form>
-      </Space>
+      </div>
     </Modal>
   );
 };

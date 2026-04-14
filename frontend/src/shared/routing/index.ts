@@ -9,6 +9,7 @@ export const routes = {
   favorites: createRoute(),
   eventDetails: createRoute<{ id: string }>(),
   login: createRoute(),
+  adminMessage: createRoute(),
 };
 
 // 2. Mapping routes to paths
@@ -20,6 +21,7 @@ export const router = createHistoryRouter({
     { path: '/favorites', route: routes.favorites },
     { path: '/events/:id', route: routes.eventDetails },
     { path: '/login', route: routes.login },
+    { path: '/admin-message', route: routes.adminMessage },
   ],
 });
 
