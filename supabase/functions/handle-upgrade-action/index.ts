@@ -65,7 +65,7 @@ Deno.serve(async (req: Request) => {
           name_user: requestRow.applicant_name,
           id_category: 2, // Special_user
           id_region: 0,
-          password_hash: 'managed_by_auth',
+          password_hash: 'supabase_auth_managed_placeholder',
           profile_onboarding_completed: true
         }, { onConflict: 'auth_user_id' });
 

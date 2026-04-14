@@ -67,14 +67,32 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       return resolveCurrentUserDbId(retries - 1);
     }
 
-    const { data: upsertData, error: upsertError } = await supabase.from('users').upsert({
+    // 1. Check if user already exists to avoid resetting their role
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id_user, id_category')
+      .eq('auth_user_id', user.authUserId)
+      .maybeSingle();
+
+    const payload: any = {
       auth_user_id: user.authUserId,
       email: user.email,
       name_user: user.name,
-      password_hash: 'managed_by_auth',
-      id_region: 0,
-      profile_onboarding_completed: false
-    }, { onConflict: 'auth_user_id', ignoreDuplicates: false }).select('id_user, id_category').single();
+      password_hash: 'supabase_auth_managed_placeholder',
+    };
+
+    // Only set default role and region for BRAND NEW users
+    if (!existingUser) {
+      payload.id_category = 1;
+      payload.id_region = 0;
+      payload.profile_onboarding_completed = false;
+    }
+
+    const { data: upsertData, error: upsertError } = await supabase
+      .from('users')
+      .upsert(payload, { onConflict: 'auth_user_id', ignoreDuplicates: false })
+      .select('id_user, id_category')
+      .single();
 
     if (upsertError) return null;
     return upsertData?.id_user ?? null;
