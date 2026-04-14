@@ -57,24 +57,31 @@ type EventFilters = {
   regionId: string | null;
   categoryId: string | null;
   date: string | null;
+  limit: number;
+  offset: number;
 };
 
+export const PAGE_SIZE = 50;
+
 type SupabaseEventRow = {
-  id_event: number;
-  name_event: string;
-  name_artist: string;
-  place_event: string;
-  description: string;
-  picture: string | null;
-  start_date: string;
-  start_hour: string;
-  end_date: string;
-  end_hour: string;
-  id_region: number;
-  id_event_category: number;
-  id_user: number;
-  region: string;
-  category: string;
+  out_id_event: number;
+  out_name_event: string;
+  out_name_artist: string;
+  out_place_event: string;
+  out_description: string;
+  out_picture: string | null;
+  out_start_date: string;
+  out_start_hour: string;
+  out_end_date: string;
+  out_end_hour: string;
+  out_id_region: number;
+  out_id_event_category: number;
+  out_id_user: number;
+  out_region: string;
+  out_category: string;
+  out_is_free: boolean;
+  out_price_info: string | null;
+  out_ticket_url: string | null;
 };
 
 type RegionRow = {
@@ -134,26 +141,26 @@ const getCategoryDefaultImage = (categoryId: number): string => {
 
 const mapEventRow = (row: SupabaseEventRow): EventItem => {
   // Treat the old unsplash fallback or any obviously generic placeholder as "no image"
-  const isOldFallback = row.picture && row.picture.includes('photo-1514525253161-7a46d19cd819');
-  const hasValidPicture = row.picture && !isOldFallback && row.picture.trim() !== '';
+  const isOldFallback = row.out_picture && row.out_picture.includes('photo-1514525253161-7a46d19cd819');
+  const hasValidPicture = row.out_picture && !isOldFallback && row.out_picture.trim() !== '';
   
   return {
-    id: String(row.id_event),
-    title: row.name_event,
-    artist: row.name_artist,
-    place: row.place_event,
-    description: row.description,
-    regionId: row.id_region,
-    region: row.region,
-    startDate: row.start_date,
-    date: formatDate(row.start_date),
-    image: hasValidPicture ? row.picture! : getCategoryDefaultImage(row.id_event_category),
-    categoryId: row.id_event_category,
-    category: row.category,
-    startHour: row.start_hour,
-    endDate: row.end_date,
-    endHour: row.end_hour,
-    ownerId: String(row.id_user),
+    id: String(row.out_id_event),
+    title: row.out_name_event,
+    artist: row.out_name_artist,
+    place: row.out_place_event,
+    description: row.out_description,
+    regionId: row.out_id_region,
+    region: row.out_region,
+    startDate: row.out_start_date,
+    date: formatDate(row.out_start_date),
+    image: hasValidPicture ? row.out_picture! : getCategoryDefaultImage(row.out_id_event_category),
+    categoryId: row.out_id_event_category,
+    category: row.out_category,
+    startHour: row.out_start_hour,
+    endDate: row.out_end_date,
+    endHour: row.out_end_hour,
+    ownerId: String(row.out_id_user),
   };
 };
 
@@ -178,12 +185,13 @@ const buildEventPayload = (values: EventMutationValues) => ({
 const normalizeFilters = (filters: EventFilters) => ({
   p_search_text: filters.searchText.trim().length > 0 ? filters.searchText.trim() : null,
   p_region_id: filters.regionId ? Number(filters.regionId) : null,
-  p_category_id: filters.categoryId ? Number(filters.categoryId) : null,
   p_event_date: filters.date,
+  p_limit: filters.limit,
+  p_offset: filters.offset,
 });
 
 const loadEventRows = async (filters: EventFilters): Promise<EventItem[]> => {
-  const { data, error } = await publicSupabase.rpc('search_events', normalizeFilters(filters));
+  const { data, error } = await publicSupabase.rpc('search_events_v2', normalizeFilters(filters));
 
   if (error) {
     throw error;
@@ -280,11 +288,25 @@ const toggleEventLike = async ({ userId, eventId }: EventLikeMutation): Promise<
 };
 
 export const fetchEventsFx = createEffect(loadEventRows);
+export const fetchCategoryCountsFx = createEffect(async (filters: Omit<EventFilters, 'categoryId' | 'limit' | 'offset'>) => {
+  const { data, error } = await publicSupabase.rpc('get_category_counts', {
+    p_search_text: filters.searchText.trim().length > 0 ? filters.searchText.trim() : null,
+    p_region_id: filters.regionId ? Number(filters.regionId) : null,
+    p_event_date: filters.date,
+  });
+
+  if (error) throw error;
+
+  return (data || []) as { out_category_id: number; out_event_count: number }[];
+});
+
 export const fetchAllEventsFx = createEffect(async (): Promise<EventItem[]> => loadEventRows({
   searchText: '',
   regionId: null,
   categoryId: null,
   date: null,
+  limit: PAGE_SIZE,
+  offset: 0,
 }));
 export const fetchEventByIdFx = createEffect(loadEventRowById);
 export const fetchLikedEventIdsFx = createEffect(loadLikedEventIds);
@@ -392,10 +414,16 @@ export const searchChanged = createEvent<string>();
 export const regionChanged = createEvent<string | null>();
 export const categoryChanged = createEvent<string | null>();
 export const dateChanged = createEvent<string | null>();
+export const eventsLoadMore = createEvent<void>();
 export const clearLikedEventIds = createEvent<void>();
 
 export const $events = createStore<EventItem[]>([])
-  .on(fetchEventsFx.doneData, (_, nextEvents) => sortEvents(nextEvents))
+  .on(fetchEventsFx.done, (state, { params, result }) => {
+    // If offset is 0, it's a fresh search/filter, replace the list
+    if (params.offset === 0) return sortEvents(result);
+    // Otherwise append
+    return sortEvents([...state, ...result]);
+  })
   .on(addEventFx.doneData, (events, nextEvent) => sortEvents([...events, nextEvent]))
   .on(updateEventFx.doneData, (events, nextEvent) => sortEvents(events.map((event) => (event.id === nextEvent.id ? nextEvent : event))))
   .on(deleteEventFx.doneData, (events, deletedEventId) => events.filter((event) => event.id !== deletedEventId));
@@ -431,26 +459,37 @@ export const $searchText = createStore<string>('').on(searchChanged, (_, next) =
 export const $selectedRegionId = createStore<string | null>(null).on(regionChanged, (_, next) => next);
 export const $selectedCategoryId = createStore<string | null>(null).on(categoryChanged, (_, next) => next);
 export const $selectedDate = createStore<string | null>(null).on(dateChanged, (_, next) => next);
+export const $offset = createStore<number>(0)
+  .on(eventsLoadMore, (state) => state + PAGE_SIZE)
+  .reset([searchChanged, regionChanged, categoryChanged, dateChanged]);
+
+export const $hasMoreEvents = createStore<boolean>(true)
+  .on(fetchEventsFx.doneData, (_, result) => result.length === PAGE_SIZE)
+  .reset([searchChanged, regionChanged, categoryChanged, dateChanged]);
+
+export const $categoryCounts = createStore<Record<number, number>>({})
+  .on(fetchCategoryCountsFx.doneData, (_, counts) => {
+    return counts.reduce((acc, { out_category_id, out_event_count }) => {
+      acc[out_category_id] = Number(out_event_count);
+      return acc;
+    }, {} as Record<number, number>);
+  });
 
 export const $regionOptions = createStore<FilterOption[]>([]).on(fetchRegionsFx.doneData, (_, nextOptions) => nextOptions);
 export const $categoryOptions = createStore<FilterOption[]>([]).on(fetchCategoriesFx.doneData, (_, nextOptions) => nextOptions);
 export const $enrichedCategoryOptions = combine(
   $categoryOptions,
-  $events,
-  (options, events) => {
-    const today = dayjs().startOf('day');
-    const counts = events.reduce<Record<number, number>>((acc, event) => {
-      if (!dayjs(event.endDate).isBefore(today, 'day')) {
-        acc[event.categoryId] = (acc[event.categoryId] || 0) + 1;
-      }
-      return acc;
-    }, {});
-
-    return options.map(opt => ({
-      ...opt,
-      disabled: !counts[Number(opt.value)],
-      label: `${opt.label}${counts[Number(opt.value)] ? ` (${counts[Number(opt.value)]})` : ''}`,
-    }));
+  $categoryCounts,
+  (options, counts) => {
+    return options.map(opt => {
+      const categoryId = Number(opt.value);
+      const eventCount = counts[categoryId] || 0;
+      return {
+        ...opt,
+        disabled: eventCount === 0,
+        label: `${opt.label}${eventCount > 0 ? ` (${eventCount})` : ''}`,
+      };
+    });
   }
 );
 
@@ -460,15 +499,27 @@ sample({
 });
 
 sample({
-  clock: [eventsPageOpened, homePageOpened, searchChanged, regionChanged, categoryChanged, dateChanged],
+  clock: [eventsPageOpened, homePageOpened, searchChanged, regionChanged, categoryChanged, dateChanged, eventsLoadMore],
   source: {
     searchText: $searchText,
     regionId: $selectedRegionId,
     categoryId: $selectedCategoryId,
     date: $selectedDate,
+    offset: $offset,
   },
-  fn: (filters): EventFilters => filters,
+  fn: (filters): EventFilters => ({ ...filters, limit: PAGE_SIZE }),
   target: fetchEventsFx,
+});
+
+// Specifically fetch category counts only when the filters that affect them change (ignoring the category filter itself)
+sample({
+  clock: [eventsPageOpened, homePageOpened, searchChanged, regionChanged, dateChanged],
+  source: {
+    searchText: $searchText,
+    regionId: $selectedRegionId,
+    date: $selectedDate,
+  },
+  target: fetchCategoryCountsFx,
 });
 
 sample({

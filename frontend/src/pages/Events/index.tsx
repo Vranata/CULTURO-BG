@@ -29,6 +29,8 @@ import {
   regionChanged,
   searchChanged,
   updateEventFx,
+  eventsLoadMore,
+  $hasMoreEvents,
 } from '../../entities/events/model';
 import {
   $isAdmin,
@@ -206,6 +208,8 @@ const Events: React.FC = () => {
     createEvent: addEventFx,
     changeEvent: updateEventFx,
     removeEvent: deleteEventFx,
+    loadMore: eventsLoadMore,
+    hasMore: $hasMoreEvents,
     isCreating: addEventFx.pending,
     isUpdating: updateEventFx.pending,
   });
@@ -653,6 +657,20 @@ const Events: React.FC = () => {
                     </Col>
                   );
                 })}
+
+                {hasMore && (
+                  <Col span={24} style={{ textAlign: 'center', marginTop: '32px' }}>
+                    <Button
+                      size="large"
+                      loading={isLoading}
+                      onClick={() => loadMore()}
+                      icon={<DownCircleOutlined />}
+                      style={{ minWidth: '200px' }}
+                    >
+                      {isLoading ? 'Зареждане...' : 'Зареди още събития'}
+                    </Button>
+                  </Col>
+                )}
               </Row>
             ) : (
               <div style={{ textAlign: 'center', padding: '100px 0' }}>
