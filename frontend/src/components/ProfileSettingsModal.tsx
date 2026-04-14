@@ -52,7 +52,7 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   const [isPasswordChangeVisible, setIsPasswordChangeVisible] = useState(false);
   const availableCategories = useMemo(() => (categoryOptions.length > 0 ? categoryOptions : fallbackCategoryOptions), [categoryOptions]);
 
-  const resolveCurrentUserDbId = async () => {
+  const resolveCurrentUserDbId = async (retries = 2): Promise<number | null> => {
     console.log('[Preferences] resolveCurrentUserDbId: querying for auth_user_id =', user.authUserId);
     const { data, error } = await supabase
       .from('users')
@@ -70,8 +70,16 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       return data.id_user;
     }
 
-    // Fallback: If user row doesn't exist (e.g. registered before trigger added), create it
-    console.warn('[Preferences] resolveCurrentUserDbId: user row not found, creating via upsert...');
+    // Auth session may not be fully established yet (RLS blocks SELECT when auth.uid() is null).
+    // Retry after a short delay before giving up.
+    if (retries > 0) {
+      console.warn('[Preferences] resolveCurrentUserDbId: user row not found, retrying in 500ms...', retries, 'retries left');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return resolveCurrentUserDbId(retries - 1);
+    }
+
+    // Last resort: upsert only if user genuinely doesn't exist (no destructive field overwrite)
+    console.warn('[Preferences] resolveCurrentUserDbId: user row not found after retries, attempting upsert...');
     const { data: upsertData, error: upsertError } = await supabase.from('users').upsert({
       auth_user_id: user.authUserId,
       email: user.email,
@@ -80,7 +88,7 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       password_hash: 'supabase_auth_managed_placeholder',
       id_region: 0,
       profile_onboarding_completed: false
-    }, { onConflict: 'auth_user_id' }).select('id_user').single();
+    }, { onConflict: 'auth_user_id', ignoreDuplicates: false }).select('id_user').single();
 
     if (upsertError) {
       console.error('[Preferences] resolveCurrentUserDbId: upsert failed', upsertError);
