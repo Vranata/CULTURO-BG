@@ -8,15 +8,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false }
 });
 
-const TEXTS = {
-  success: 'Успешно',
-  error: 'Грешка',
-  missingParams: 'Липсват задължителни параметри.',
-  notFound: 'Заявката не бе намерена.',
-  alreadyProcessed: 'Тази заявка Вече е била обработена.',
-  dbError: 'Възникна техническа грешка при запис в базата.',
-};
-
 function redirectResponse(type: 'success' | 'error' | 'info' | 'warning', text: string, debug?: string) {
   const url = new URL(`${FRONTEND_URL}/admin-message`);
   url.searchParams.set('type', type);
@@ -37,26 +28,19 @@ Deno.serve(async (req: Request) => {
     const authUserId = url.searchParams.get('auth_user_id');
 
     if (!action || !requestId || !authUserId) {
-      return redirectResponse('error', TEXTS.missingParams);
+      return redirectResponse('error', 'Липсват параметри.');
     }
 
-    // 1. Fetch request details
     const { data: requestRow, error: fetchError } = await supabase
       .from('user_upgrade_requests')
       .select('*')
       .eq('id_request', requestId)
       .single();
 
-    if (fetchError || !requestRow) {
-      return redirectResponse('error', TEXTS.notFound);
-    }
-
-    if (requestRow.status !== 'pending' && action !== 'reject') {
-      return redirectResponse('info', `${TEXTS.alreadyProcessed} (${requestRow.status})`, `User: ${authUserId}`);
-    }
+    if (fetchError || !requestRow) return redirectResponse('error', 'Заявката не е намерена.');
 
     if (action === 'approve') {
-       // Agressive Upsert: Try to identify by auth_user_id and ensure role is 2
+       // Perform the upgrade
        const { error: upgradeError } = await supabase
         .from('users')
         .upsert({
@@ -69,22 +53,30 @@ Deno.serve(async (req: Request) => {
           profile_onboarding_completed: true
         }, { onConflict: 'auth_user_id' });
 
-      if (upgradeError) {
-        return redirectResponse('error', `${TEXTS.dbError}: ${upgradeError.message}`);
-      }
+      if (upgradeError) return redirectResponse('error', `Грешка при ъпгрейд: ${upgradeError.message}`);
+
+      // VERIFICATION: Read back the user immediately
+      const { data: verifiedUser } = await supabase
+        .from('users')
+        .select('id_category, email')
+        .eq('auth_user_id', authUserId)
+        .single();
+      
+      const debugResult = verifiedUser 
+        ? `Status: OK | DB_RoleID: ${verifiedUser.id_category} | AuthID: ${authUserId.substring(0,8)}...`
+        : `Status: NOT_FOUND_AFTER_WRITE | AuthID: ${authUserId}`;
+
+      await supabase.from('user_upgrade_requests').update({ status: 'approved' }).eq('id_request', requestId);
+      
+      return redirectResponse('success', `Потребителят е одобрен успешно!`, debugResult);
     }
 
-    // Update request status
-    await supabase
-      .from('user_upgrade_requests')
-      .update({ status: action === 'approve' ? 'approved' : 'rejected' })
-      .eq('id_request', requestId);
+    if (action === 'reject') {
+      await supabase.from('user_upgrade_requests').update({ status: 'rejected' }).eq('id_request', requestId);
+      return redirectResponse('success', 'Заявката е отхвърлена.');
+    }
 
-    const successMsg = action === 'approve' 
-      ? `Потребителят ${requestRow.applicant_email} е одобрен!` 
-      : 'Заявката е отхвърлена.';
-      
-    return redirectResponse('success', successMsg, `ID: ${authUserId} | Email: ${requestRow.applicant_email}`);
+    return redirectResponse('error', 'Невалидно действие.');
 
   } catch (err: any) {
     return redirectResponse('error', err.message || String(err));
