@@ -524,25 +524,25 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
-  border-radius: 14px;
+  padding: 6px 14px;
+  border-radius: 10px;
   color: var(--text-secondary);
   font-weight: 700;
+  height: 38px;
+  line-height: 1;
   white-space: nowrap;
-  transition: color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .app-navigation-link:hover {
   color: var(--accent);
   background: var(--nav-hover-bg);
-  transform: translateY(-1px) scale(1.02);
 }
 
 .app-navigation-link-active {
   color: var(--accent);
   background: var(--nav-active-bg);
   border: 1px solid var(--nav-active-border);
-  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.08);
   font-weight: 800;
 }
 

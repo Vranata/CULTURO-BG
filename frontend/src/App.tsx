@@ -194,7 +194,7 @@ const App: React.FC = () => {
             gap: 18,
             position: 'sticky',
             top: 0,
-            zIndex: 10000,
+            zIndex: 1001,
             width: '100%',
             padding: '0 24px',
             background: 'var(--header-bg)',
