@@ -4,10 +4,10 @@
   --surface-elevated: #ffffff;
   --text-primary: #10253f;
   --text-secondary: #5f6b7a;
-  --header-bg: #ffffff;
-  --header-text: #10253f;
-  --footer-bg: #f8fafc;
-  --footer-text: #5f6b7a;
+  --header-bg: #001529;
+  --header-text: #ffffff;
+  --footer-bg: #001529;
+  --footer-text: rgba(255,255,255,0.65);
   --border-color: rgba(15, 23, 42, 0.08);
   --shadow-soft: 0 16px 40px rgba(15, 23, 42, 0.08);
   --hero-bg: linear-gradient(135deg, #1d6fff 0%, #36a2ff 100%);
@@ -15,13 +15,13 @@
   --hero-button-bg: #ffffff;
   --hero-button-text: #1890ff;
   --accent: #1890ff;
-  --toggle-bg: #f8fafc;
-  --toggle-fg: #64748b;
-  --toggle-border: #e2e8f0;
-  --nav-hover-bg: rgba(24, 144, 255, 0.08);
-  --nav-active-bg: rgba(24, 144, 255, 0.06);
-  --nav-active-border: rgba(24, 144, 255, 0.12);
-  --nav-active-text: #1890ff;
+  --toggle-bg: rgba(255,255,255,0.1);
+  --toggle-fg: #ffffff;
+  --toggle-border: rgba(255,255,255,0.15);
+  --nav-hover-bg: rgba(255, 255, 255, 0.12);
+  --nav-active-bg: rgba(255, 255, 255, 0.15);
+  --nav-active-border: rgba(255, 255, 255, 0.2);
+  --nav-active-text: #ffffff;
 }
 
 .home-page {

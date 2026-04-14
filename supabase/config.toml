@@ -1,2 +1,5 @@
 [functions.send-upgrade-request]
 verify_jwt = false
+
+[functions.handle-role-downgrade]
+verify_jwt = true
