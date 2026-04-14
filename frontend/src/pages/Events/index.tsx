@@ -187,6 +187,8 @@ const Events: React.FC = () => {
     removeEvent,
     isCreating,
     isUpdating,
+    loadMore,
+    hasMore,
   } = useUnit({
     events: $events,
     isLoading: $isLoading,
@@ -208,10 +210,10 @@ const Events: React.FC = () => {
     createEvent: addEventFx,
     changeEvent: updateEventFx,
     removeEvent: deleteEventFx,
-    loadMore: eventsLoadMore,
-    hasMore: $hasMoreEvents,
     isCreating: addEventFx.pending,
     isUpdating: updateEventFx.pending,
+    loadMore: eventsLoadMore,
+    hasMore: $hasMoreEvents,
   });
 
   const currentUserId = user?.id ?? null;
