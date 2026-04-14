@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
-import { Button, Result, Typography, Card, Descriptions, Divider } from 'antd';
+import { Button, Result, Typography, Card, Descriptions, Divider, Space, Alert } from 'antd';
 import { useUnit } from 'effector-react';
 import { history } from '../../shared/routing';
 import { $user, refreshUserProfile } from '../../entities/model';
+import { ReloadOutlined } from '@ant-design/icons';
 
 const AdminMessage: React.FC = () => {
   const { user, refresh } = useUnit({
@@ -13,7 +14,8 @@ const AdminMessage: React.FC = () => {
   const searchParams = new URLSearchParams(window.location.search);
   const type = (searchParams.get('type') as 'success' | 'error' | 'info' | 'warning') || 'info';
   const text = searchParams.get('text') || 'Операцията приключи.';
-  const serverDebug = searchParams.get('debug') || 'Няма данни от сървъра';
+  const serverDebug = searchParams.get('debug') || 'Няма данни';
+  const targetId = searchParams.get('target_id') || 'Неизвестно';
 
   useEffect(() => {
     if (type === 'success') {
@@ -25,35 +27,71 @@ const AdminMessage: React.FC = () => {
     history.push('/');
   };
 
+  const handleManualRefresh = () => {
+    refresh();
+  };
+
+  const idsMatch = user?.authUserId === targetId;
+
   return (
     <div style={{ padding: '40px 20px', maxWidth: '900px', margin: '0 auto' }}>
       <Card bordered={false} style={{ borderRadius: '16px', boxShadow: '0 8px 30px rgba(0,0,0,0.08)' }}>
         <Result
           status={type}
-          title={type === 'success' ? 'Резултат: Успех' : 'Резулат'}
+          title={type === 'success' ? 'Резултат: Успех' : 'Инфо'}
           subTitle={text}
           extra={[
-            <Button type="primary" key="home" onClick={handleBack} size="large" style={{ borderRadius: '8px' }}>
-              Към началната страница
-            </Button>,
+            <Space key="actions">
+              <Button type="primary" onClick={handleBack} size="large" style={{ borderRadius: '8px' }}>
+                Към началната страница
+              </Button>
+              <Button icon={<ReloadOutlined />} onClick={handleManualRefresh} size="large" style={{ borderRadius: '8px' }}>
+                Опресни профила
+              </Button>
+            </Space>,
           ]}
         />
 
-        <Divider>Сървърна Диагностика (Edge Function)</Divider>
-        <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '20px' }}>
-          <Typography.Text strong>Отговор от базата данни: </Typography.Text>
+        {type === 'success' && !idsMatch && user && (
+          <Alert
+            message="Внимание: Разминаване в акаунтите"
+            description="Изглежда, че сте логнати с различен акаунт от този, който току-що одобрихте. Проверете Auth ID-тата по-долу."
+            type="warning"
+            showIcon
+            style={{ marginBottom: '20px' }}
+          />
+        )}
+
+        <Divider>Сравнителна Диагностика</Divider>
+        <Descriptions bordered column={1} size="small">
+          <Descriptions.Item label="Целево ID (Одобрено от сървъра)">
+            <Typography.Text code>{targetId}</Typography.Text>
+          </Descriptions.Item>
+          
+          <Descriptions.Item label="Твоето ID (Сесия в браузъра)">
+            <Typography.Text code copyable>{user?.authUserId || 'Не сте логнати'}</Typography.Text>
+          </Descriptions.Item>
+          
+          <Descriptions.Item label="Статус на съвпадение">
+            {idsMatch ? (
+              <Typography.Text type="success" strong>Одобрявате вашия собствен акаунт ✅</Typography.Text>
+            ) : (
+              <Typography.Text type="danger" strong>Одобрявате ДРУГ акаунт ❌</Typography.Text>
+            )}
+          </Descriptions.Item>
+
+          <Descriptions.Item label="Текуща роля (в браузъра)">
+            <Typography.Text strong>{user?.roleName || 'N/A'}</Typography.Text>
+          </Descriptions.Item>
+        </Descriptions>
+
+        <Divider>Сървърен лог</Divider>
+        <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px' }}>
           <Typography.Text code>{serverDebug}</Typography.Text>
         </div>
 
-        <Divider>Клиентска Диагностика (Браузър)</Divider>
-        <Descriptions bordered column={1} size="small">
-          <Descriptions.Item label="Имейл (Логнат)">{user?.email || 'N/A'}</Descriptions.Item>
-          <Descriptions.Item label="Роля (Име)">{user?.roleName || 'N/A'}</Descriptions.Item>
-          <Descriptions.Item label="Роля (ID)">{user?.roleId || 'N/A'}</Descriptions.Item>
-        </Descriptions>
-
-        <Divider>Raw Debug (Пълен обект)</Divider>
-        <pre style={{ background: '#1e1e1e', color: '#d4d4d4', padding: '15px', borderRadius: '8px', overflow: 'auto', fontSize: '12px' }}>
+        <Divider>Raw JSON</Divider>
+        <pre style={{ background: '#1e1e1e', color: '#d4d4d4', padding: '15px', borderRadius: '8px', overflow: 'auto', fontSize: '11px', maxHeight: '200px' }}>
           {JSON.stringify(user, null, 2)}
         </pre>
       </Card>

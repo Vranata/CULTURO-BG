@@ -29,6 +29,7 @@ const getRouteKey = (pathname: string) => {
   if (pathname === '/recommended') return 'recommended';
   if (pathname === '/favorites') return 'favorites';
   if (pathname === '/login') return 'login';
+  if (pathname === '/admin-result') return 'admin-result';
   return 'home';
 };
 

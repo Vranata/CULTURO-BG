@@ -21,7 +21,7 @@ export const router = createHistoryRouter({
     { path: '/favorites', route: routes.favorites },
     { path: '/events/:id', route: routes.eventDetails },
     { path: '/login', route: routes.login },
-    { path: '/admin-message', route: routes.adminMessage },
+    { path: '/admin-result', route: routes.adminMessage },
   ],
 });
 
