@@ -325,6 +325,20 @@ const Events: React.FC = () => {
     };
   }, [events]);
 
+  useEffect(() => {
+    const sentinel = document.getElementById('events-load-more-sentinel');
+    if (!sentinel || !hasMore) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && !isLoading) {
+        loadMore();
+      }
+    }, { threshold: 0.1 });
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, isLoading, loadMore]);
+
   const clearFilters = () => {
     onSearch('');
     onRegionChange(null);
@@ -661,16 +675,23 @@ const Events: React.FC = () => {
                 })}
 
                 {hasMore && (
-                  <Col span={24} style={{ textAlign: 'center', marginTop: '32px' }}>
-                    <Button
-                      size="large"
-                      loading={isLoading}
-                      onClick={() => loadMore()}
-                      icon={<DownCircleOutlined />}
-                      style={{ minWidth: '200px' }}
+                  <Col span={24}>
+                    <div
+                      id="events-load-more-sentinel"
+                      style={{
+                        height: '100px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginTop: '16px'
+                      }}
                     >
-                      {isLoading ? 'Зареждане...' : 'Зареди още събития'}
-                    </Button>
+                      {isLoading ? (
+                        <Spin size="large" />
+                      ) : (
+                        <div style={{ visibility: 'hidden' }}>Sentinel</div>
+                      )}
+                    </div>
                   </Col>
                 )}
               </Row>
