@@ -71,11 +71,10 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       auth_user_id: user.authUserId,
       email: user.email,
       name_user: user.name,
-      id_category: 1,
-      password_hash: 'supabase_auth_managed_placeholder',
+      password_hash: 'managed_by_auth',
       id_region: 0,
       profile_onboarding_completed: false
-    }, { onConflict: 'auth_user_id', ignoreDuplicates: false }).select('id_user').single();
+    }, { onConflict: 'auth_user_id', ignoreDuplicates: false }).select('id_user, id_category').single();
 
     if (upsertError) return null;
     return upsertData?.id_user ?? null;
