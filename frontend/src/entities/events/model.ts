@@ -185,6 +185,7 @@ const buildEventPayload = (values: EventMutationValues) => ({
 const normalizeFilters = (filters: EventFilters) => ({
   p_search_text: filters.searchText.trim().length > 0 ? filters.searchText.trim() : null,
   p_region_id: filters.regionId ? Number(filters.regionId) : null,
+  p_category_id: filters.categoryId ? Number(filters.categoryId) : null,
   p_event_date: filters.date,
   p_limit: filters.limit,
   p_offset: filters.offset,
