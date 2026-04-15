@@ -61,7 +61,7 @@ type EventFilters = {
   offset: number;
 };
 
-export const PAGE_SIZE = 50;
+export const PAGE_SIZE = 48;
 
 type SupabaseEventRow = {
   out_id_event: number;
@@ -143,7 +143,7 @@ const mapEventRow = (row: SupabaseEventRow): EventItem => {
   // Treat the old unsplash fallback or any obviously generic placeholder as "no image"
   const isOldFallback = row.out_picture && row.out_picture.includes('photo-1514525253161-7a46d19cd819');
   const hasValidPicture = row.out_picture && !isOldFallback && row.out_picture.trim() !== '';
-  
+
   return {
     id: String(row.out_id_event),
     title: row.out_name_event,
@@ -301,14 +301,39 @@ export const fetchCategoryCountsFx = createEffect(async (filters: Omit<EventFilt
   return (data || []) as { out_category_id: number; out_event_count: number }[];
 });
 
-export const fetchAllEventsFx = createEffect(async (): Promise<EventItem[]> => loadEventRows({
-  searchText: '',
-  regionId: null,
-  categoryId: null,
-  date: null,
-  limit: PAGE_SIZE,
-  offset: 0,
-}));
+export const fetchAllEventsFx = createEffect(async (): Promise<EventItem[]> => {
+  const { data, error } = await publicSupabase
+    .from('events')
+    .select('*, regions(region), event_category(name_event_category)')
+    .gte('end_date', dayjs().format('YYYY-MM-DD'))
+    .order('start_date', { ascending: true })
+    .order('start_hour', { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []).map((row: any) => ({
+    id: String(row.id_event),
+    title: row.name_event,
+    artist: row.name_artist,
+    place: row.place_event,
+    description: row.description,
+    regionId: row.id_region,
+    region: row.regions?.region || '',
+    startDate: row.start_date,
+    date: formatDate(row.start_date),
+    image: (row.picture && row.picture.trim() !== '' && !row.picture.includes('photo-1514525253161-7a46d19cd819'))
+      ? row.picture
+      : getCategoryDefaultImage(row.id_event_category),
+    categoryId: row.id_event_category,
+    category: row.event_category?.name_event_category || '',
+    startHour: row.start_hour,
+    endDate: row.end_date,
+    endHour: row.end_hour,
+    ownerId: String(row.id_user),
+  }));
+});
 export const fetchEventByIdFx = createEffect(loadEventRowById);
 export const fetchLikedEventIdsFx = createEffect(loadLikedEventIds);
 export const toggleEventLikeFx = createEffect(toggleEventLike);

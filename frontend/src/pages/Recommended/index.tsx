@@ -16,6 +16,7 @@ import { $user } from '../../entities/model';
 import { $effectiveRegionId } from '../../entities/location/model';
 
 const { Title, Paragraph, Text } = Typography;
+const RECOMMENDED_PAGE_SIZE = 24;
 
 type UserRow = {
   id_user: number;
@@ -59,6 +60,7 @@ const Recommended: React.FC = () => {
   const [preferredCategoryIds, setPreferredCategoryIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [displayLimit, setDisplayLimit] = useState(18);
 
   const { user, effectiveRegionId, likedEventIds, loadAllEvents, loadLikedEventIds, resetLikedEvents } = useUnit({
     user: $user,
@@ -81,72 +83,54 @@ const Recommended: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  const syncPageData = React.useCallback(async () => {
+    setIsLoading(true);
+    setDisplayLimit(18);
 
-    const syncPageData = async () => {
-      setIsLoading(true);
+    try {
+      const result = await loadAllEvents();
 
-      try {
-        const loadedEvents = await loadAllEvents();
-
-        if (cancelled) {
-          return;
-        }
-
-        setAllEvents(loadedEvents);
-
-        if (!user) {
-          resetLikedEvents();
-          setPreferredCategoryIds([]);
-          return;
-        }
-
-        const currentUserDbId = await resolveCurrentUserDbId(user.authUserId);
-
-        if (currentUserDbId === null) {
-          if (!cancelled) {
-            resetLikedEvents();
-            setPreferredCategoryIds([]);
-          }
-
-          return;
-        }
-
-        if (!cancelled) {
-          await loadLikedEventIds(String(currentUserDbId));
-
-          const { data: preferenceRows, error: preferenceError } = await supabase
-            .from('user_likings')
-            .select('id_event_category')
-            .eq('id_user', currentUserDbId);
-
-          if (preferenceError) {
-            throw preferenceError;
-          }
-
-          setPreferredCategoryIds(((preferenceRows ?? []) as PreferenceRow[]).map((row) => String(row.id_event_category)));
-        }
-      } catch (error) {
-        if (!cancelled) {
-          messageApi.error(error instanceof Error ? error.message : 'Неуспешно зареждане на препоръките.');
-          setAllEvents([]);
-          resetLikedEvents();
-          setPreferredCategoryIds([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
+      if (result) {
+        setAllEvents(result);
       }
-    };
 
+      if (!user) {
+        resetLikedEvents();
+        setPreferredCategoryIds([]);
+        return;
+      }
+
+      const currentUserDbId = await resolveCurrentUserDbId(user.authUserId);
+
+      if (currentUserDbId === null) {
+        resetLikedEvents();
+        setPreferredCategoryIds([]);
+        return;
+      }
+
+      await loadLikedEventIds(String(currentUserDbId));
+
+      const { data: preferenceRows, error: preferenceError } = await supabase
+        .from('user_likings')
+        .select('id_event_category')
+        .eq('id_user', currentUserDbId);
+
+      if (preferenceError) throw preferenceError;
+
+      setPreferredCategoryIds(((preferenceRows ?? []) as PreferenceRow[]).map((row) => String(row.id_event_category)));
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : 'Неуспешно зареждане на препоръките.');
+      setAllEvents([]);
+      resetLikedEvents();
+      setPreferredCategoryIds([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadAllEvents, loadLikedEventIds, messageApi, resetLikedEvents, user]);
+
+  useEffect(() => {
     void syncPageData();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loadAllEvents, loadLikedEventIds, messageApi, refreshToken, resetLikedEvents, user?.authUserId]);
+  }, [refreshToken, user?.authUserId]);
 
   const recommendedEvents = useMemo(() => {
     const likedEventIdSet = new Set(likedEventIds);
@@ -205,6 +189,22 @@ const Recommended: React.FC = () => {
       });
   }, [allEvents, effectiveRegionId, likedEventIds, preferredCategoryIds]);
 
+  const hasMore = displayLimit < recommendedEvents.length;
+
+  useEffect(() => {
+    const sentinel = document.getElementById('recommended-sentinel');
+    if (!sentinel || !hasMore || isLoading) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setDisplayLimit((prev) => prev + RECOMMENDED_PAGE_SIZE);
+      }
+    }, { threshold: 0.1 });
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, isLoading, recommendedEvents.length]);
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 24px', color: 'var(--text-primary)' }}>
       {contextHolder}
@@ -237,13 +237,30 @@ const Recommended: React.FC = () => {
           <Spin size="large" description="Зареждане на препоръки..." />
         </div>
       ) : recommendedEvents.length > 0 ? (
-        <Row gutter={[24, 24]}>
-          {recommendedEvents.slice(0, 12).map(({ event, reasonTags }) => (
-            <Col xs={24} sm={12} lg={8} key={event.id}>
-              <EventSpotlightCard event={event} reasonTags={reasonTags} />
-            </Col>
-          ))}
-        </Row>
+        <>
+          <Row gutter={[24, 24]}>
+            {recommendedEvents.slice(0, displayLimit).map(({ event, reasonTags }) => (
+              <Col xs={24} sm={12} lg={8} key={event.id}>
+                <EventSpotlightCard event={event} reasonTags={reasonTags} />
+              </Col>
+            ))}
+          </Row>
+
+          {hasMore && (
+            <div
+              id="recommended-sentinel"
+              style={{
+                height: '100px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: '32px'
+              }}
+            >
+              <Spin size="large" />
+            </div>
+          )}
+        </>
       ) : (
         <Empty
           description="Няма достатъчно данни за персонализирани препоръки в момента."
