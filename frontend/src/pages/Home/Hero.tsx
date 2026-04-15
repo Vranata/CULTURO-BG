@@ -111,7 +111,7 @@ const Hero: React.FC = () => {
                   style={{ cursor: 'pointer' }}
                 >
                   <div className="home-hero-row-time">
-                    <ClockCircleOutlined /> {event.startHour.substring(0, 5)}
+                    <ClockCircleOutlined /> {event.startHour ? event.startHour.substring(0, 5) : '--:--'}
                   </div>
                   <div className="home-hero-row-copy">
                     <strong>{event.title}</strong>
