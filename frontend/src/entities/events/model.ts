@@ -216,9 +216,34 @@ const loadEventRowById = async (eventId: string): Promise<EventItem | null> => {
     throw error;
   }
 
-  const [row] = (data ?? []) as SupabaseEventRow[];
+  const [row] = (data ?? []) as any[];
 
-  return row ? mapEventRow(row) : null;
+  if (!row) return null;
+
+  // get_event_by_id returns columns without the 'out_' prefix,
+  // so we map them to the SupabaseEventRow shape that mapEventRow expects.
+  const mapped: SupabaseEventRow = {
+    out_id_event: row.id_event,
+    out_name_event: row.name_event,
+    out_name_artist: row.name_artist,
+    out_place_event: row.place_event,
+    out_description: row.description,
+    out_picture: row.picture,
+    out_start_date: row.start_date,
+    out_start_hour: row.start_hour,
+    out_end_date: row.end_date,
+    out_end_hour: row.end_hour,
+    out_id_region: row.id_region,
+    out_id_event_category: row.id_event_category,
+    out_id_user: row.id_user,
+    out_region: row.region,
+    out_category: row.category,
+    out_is_free: row.is_free,
+    out_price_info: row.price_info,
+    out_ticket_url: row.ticket_url,
+  };
+
+  return mapEventRow(mapped);
 };
 
 const loadLikedEventIds = async (userId: string): Promise<string[]> => {
