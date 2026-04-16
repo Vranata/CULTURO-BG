@@ -11,7 +11,6 @@ import {
   locationPromptClosed,
   locationRegionDetected,
 } from '../entities/location/model';
-import { useUnit } from 'effector-react';
 
 const LocationInitializer: React.FC = () => {
   const { t } = useTranslation();

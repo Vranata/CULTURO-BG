@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import { Button, Card, Col, DatePicker, FloatButton, Input, message, Popconfirm, Row, Select, Space, Spin, Tag, Typography } from 'antd';
 import { ArrowRightOutlined, CalendarOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, DownCircleOutlined, EditOutlined, EnvironmentOutlined, FireOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useUnit } from 'effector-react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'atomic-router-react';
 import EventLikeButton from '../../components/EventLikeButton';
 import GoogleCalendarButton from '../../components/GoogleCalendarButton';

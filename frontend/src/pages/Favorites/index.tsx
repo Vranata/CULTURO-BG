@@ -78,6 +78,7 @@ const Favorites: React.FC = () => {
         if (!cancelled) {
           await loadLikedEventIds(String(currentUserDbId));
         }
+      } catch (error) {
         if (!cancelled) {
           messageApi.error(error instanceof Error ? error.message : t('favorites.error_loading'));
           setAllEvents([]);
