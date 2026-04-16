@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'atomic-router-react';
 import { Button, Card, Col, Empty, Row, Space, Spin, Typography, message } from 'antd';
 import { useUnit } from 'effector-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Link } from 'atomic-router-react';
 import { supabase } from '../../services/supabaseClient';
 import { routes } from '../../shared/routing';
 import EventSpotlightCard from '../../components/EventSpotlightCard';
@@ -39,6 +40,7 @@ const resolveCurrentUserDbId = async (authUserId: string): Promise<number> => {
 };
 
 const Favorites: React.FC = () => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [allEvents, setAllEvents] = useState<EventItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,9 +78,8 @@ const Favorites: React.FC = () => {
         if (!cancelled) {
           await loadLikedEventIds(String(currentUserDbId));
         }
-      } catch (error) {
         if (!cancelled) {
-          messageApi.error(error instanceof Error ? error.message : 'Неуспешно зареждане на любими събития.');
+          messageApi.error(error instanceof Error ? error.message : t('favorites.error_loading'));
           setAllEvents([]);
           resetLikedEvents();
         }
@@ -108,20 +109,20 @@ const Favorites: React.FC = () => {
 
       <Space orientation="vertical" size="large" style={{ width: '100%', marginBottom: '32px' }}>
         <div>
-          <Title level={2} style={{ color: 'var(--text-primary)', marginBottom: 8 }}>Любими</Title>
+          <Title level={2} style={{ color: 'var(--text-primary)', marginBottom: 8 }}>{t('favorites.title')}</Title>
           <Paragraph style={{ color: 'var(--text-secondary)', marginBottom: 0 }}>
-            Всички събития, които си отбелязал с харесване.
+            {t('favorites.subtitle')}
           </Paragraph>
         </div>
 
         {!user ? (
           <Card variant="borderless" style={{ background: 'var(--surface-bg)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-soft)' }}>
             <Space orientation="vertical" size="small" style={{ width: '100%' }}>
-              <Text strong style={{ color: 'var(--text-primary)' }}>Влез, за да запазваш и преглеждаш любими събития.</Text>
-              <Text style={{ color: 'var(--text-secondary)' }}>Харесванията се показват тук само за вписани потребители.</Text>
+              <Text strong style={{ color: 'var(--text-primary)' }}>{t('favorites.guest_card_title')}</Text>
+              <Text style={{ color: 'var(--text-secondary)' }}>{t('favorites.guest_card_text')}</Text>
               <div>
                 <Link to={routes.login}>
-                  <Button type="primary">Вход / регистрация</Button>
+                  <Button type="primary">{t('auth.login_register')}</Button>
                 </Link>
               </div>
             </Space>
@@ -131,7 +132,7 @@ const Favorites: React.FC = () => {
 
       {isLoading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '96px 0' }}>
-          <Spin size="large" description="Зареждане на любими събития..." />
+          <Spin size="large" description={t('favorites.loading')} />
         </div>
       ) : user && favoriteEvents.length > 0 ? (
         <Row gutter={[24, 24]}>
@@ -143,15 +144,15 @@ const Favorites: React.FC = () => {
         </Row>
       ) : user ? (
         <Empty
-          description="Все още нямаш любими събития."
+          description={t('favorites.empty')}
           style={{ padding: '96px 0' }}
         >
           <Space wrap>
             <Link to={routes.events}>
-              <Button type="primary">Разгледай всички събития</Button>
+              <Button type="primary">{t('recommended.view_all')}</Button>
             </Link>
             <Link to={routes.recommended}>
-              <Button>Препоръчано за теб</Button>
+              <Button>{t('recommended.title')}</Button>
             </Link>
           </Space>
         </Empty>

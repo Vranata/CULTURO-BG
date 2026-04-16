@@ -2,6 +2,7 @@ import { combine, createEffect, createEvent, createStore, sample } from 'effecto
 import dayjs from 'dayjs';
 import 'dayjs/locale/bg';
 import { publicSupabase, supabase } from '../../services/supabaseClient';
+import i18n from '../../shared/i18n';
 
 dayjs.locale('bg');
 
@@ -118,9 +119,9 @@ const sortEvents = (events: EventItem[]) => [...events].sort((leftEvent, rightEv
 });
 
 const formatDate = (value: string) => {
-  const d = dayjs(value);
+  const d = dayjs(value).locale(i18n.language.startsWith('en') ? 'en' : 'bg');
   if (!d.isValid()) return value;
-  return d.format('D MMMM YYYY г.');
+  return d.format(i18n.t('formats.date'));
 };
 
 const getCategoryDefaultImage = (categoryId: number): string => {
@@ -151,12 +152,12 @@ const mapEventRow = (row: SupabaseEventRow): EventItem => {
     place: row.out_place_event,
     description: row.out_description,
     regionId: row.out_id_region,
-    region: row.out_region,
+    region: i18n.t(`data.regions.${row.out_id_region}`, { defaultValue: row.out_region }),
     startDate: row.out_start_date,
     date: formatDate(row.out_start_date),
     image: hasValidPicture ? row.out_picture! : getCategoryDefaultImage(row.out_id_event_category),
     categoryId: row.out_id_event_category,
-    category: row.out_category,
+    category: i18n.t(`data.categories.${row.out_id_event_category}`, { defaultValue: row.out_category }),
     startHour: row.out_start_hour,
     endDate: row.out_end_date,
     endHour: row.out_end_hour,
@@ -345,14 +346,14 @@ export const fetchAllEventsFx = createEffect(async (): Promise<EventItem[]> => {
     place: row.place_event,
     description: row.description,
     regionId: row.id_region,
-    region: row.regions?.region || '',
+    region: i18n.t(`data.regions.${row.id_region}`, { defaultValue: row.regions?.region || '' }),
     startDate: row.start_date,
     date: formatDate(row.start_date),
     image: (row.picture && row.picture.trim() !== '' && !row.picture.includes('photo-1514525253161-7a46d19cd819'))
       ? row.picture
       : getCategoryDefaultImage(row.id_event_category),
     categoryId: row.id_event_category,
-    category: row.event_category?.name_event_category || '',
+    category: i18n.t(`data.categories.${row.id_event_category}`, { defaultValue: row.event_category?.name_event_category || '' }),
     startHour: row.start_hour,
     endDate: row.end_date,
     endHour: row.end_hour,
@@ -438,7 +439,7 @@ export const fetchRegionsFx = createEffect(async (): Promise<FilterOption[]> => 
   }
 
   return ((data ?? []) as RegionRow[]).map((row) => ({
-    label: row.region,
+    label: i18n.t(`data.regions.${row.id_region}`, { defaultValue: row.region }),
     value: String(row.id_region),
   }));
 });
@@ -453,7 +454,7 @@ export const fetchCategoriesFx = createEffect(async (): Promise<FilterOption[]> 
   }
 
   return ((data ?? []) as CategoryRow[]).map((row) => ({
-    label: row.name_event_category,
+    label: i18n.t(`data.categories.${row.id_event_category}`, { defaultValue: row.name_event_category }),
     value: String(row.id_event_category),
   }));
 });

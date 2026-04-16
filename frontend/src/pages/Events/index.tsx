@@ -45,12 +45,13 @@ const { Title, Paragraph } = Typography;
 
 type EventSortMode = 'newest' | 'nearest' | 'liked' | 'latest';
 
-const sortModeLabels: Record<EventSortMode, string> = {
-  newest: 'Най-скорошни',
-  nearest: 'Най-близки до теб',
-  liked: 'Най-харесвани',
-  latest: 'Най-скоро добавени',
-};
+  const { t } = useTranslation();
+  const sortModeLabels: Record<EventSortMode, string> = {
+    newest: t('events.sort_newest'),
+    nearest: t('events.sort_nearest'),
+    liked: t('events.sort_liked'),
+    latest: t('events.sort_latest'),
+  };
 
 const sortModeIcons: Record<EventSortMode, React.ReactNode> = {
   newest: <ClockCircleOutlined />,
@@ -223,7 +224,7 @@ const Events: React.FC = () => {
     const authUserId = user?.authUserId;
 
     if (!authUserId) {
-      throw new Error('Профилът на потребителя не е зареден. Презареди страницата.');
+      throw new Error(t('events.error_profile'));
     }
 
     const { data, error } = await supabase
@@ -237,7 +238,7 @@ const Events: React.FC = () => {
     }
 
     if (!data) {
-      throw new Error('Потребителският профил не е синхронизиран. Презареди страницата.');
+      throw new Error(t('events.error_not_synced'));
     }
 
     return data.id_user;
@@ -438,7 +439,7 @@ const Events: React.FC = () => {
 
   const submitEvent = async (values: EventEditorValues) => {
     if (!user) {
-      const errorText = 'Трябва да си вписан, за да управляваш събития.';
+      const errorText = t('events.error_not_logged');
       setEditorError(errorText);
       messageApi.error(errorText);
       return;
@@ -455,16 +456,16 @@ const Events: React.FC = () => {
 
       if (editingEvent) {
         await changeEvent(payload);
-        messageApi.success('Събитието беше обновено.');
+        messageApi.success(t('events.event_updated'));
       } else {
         await createEvent(payload);
-        messageApi.success('Събитието беше добавено.');
+        messageApi.success(t('events.event_created'));
       }
 
       setEditorError(null);
       closeEditor();
     } catch (error) {
-      const errorText = error instanceof Error ? error.message : 'Възникна грешка при записването на събитието.';
+      const errorText = error instanceof Error ? error.message : t('events.error_save');
       setEditorError(errorText);
       messageApi.error(errorText);
     }
@@ -472,7 +473,7 @@ const Events: React.FC = () => {
 
   const deleteEvent = async (event: EventItem) => {
     if (!user) {
-      const errorText = 'Трябва да си вписан, за да управляваш събития.';
+      const errorText = t('events.error_not_logged');
       setEditorError(errorText);
       messageApi.error(errorText);
       return;
@@ -486,9 +487,9 @@ const Events: React.FC = () => {
         closeEditor();
       }
 
-      messageApi.success('Събитието беше изтрито.');
+      messageApi.success(t('events.event_deleted'));
     } catch (error) {
-      const errorText = error instanceof Error ? error.message : 'Възникна грешка при изтриването.';
+      const errorText = error instanceof Error ? error.message : t('events.error_delete');
       setEditorError(errorText);
       messageApi.error(errorText);
     }
@@ -502,16 +503,16 @@ const Events: React.FC = () => {
         <aside className="events-filters-panel">
           <div className="events-filters-panel-inner">
             <div>
-              <div className="events-filters-title">Филтри</div>
+              <div className="events-filters-title">{t('events.filters')}</div>
               <Paragraph style={{ color: 'var(--text-secondary)', marginBottom: 0 }}>
-                Подреди списъка по град, категория и дата.
+                {t('events.filters_subtitle')}
               </Paragraph>
             </div>
 
             <div className="events-filter-group">
               <div className="events-search-row">
                 <Input
-                  placeholder="Търси по име, изпълнител или описание..."
+                  placeholder={t('events.search_placeholder')}
                   allowClear
                   size="large"
                   value={searchText}
@@ -532,7 +533,7 @@ const Events: React.FC = () => {
 
             <div className="events-filter-group">
               <FilterSelect
-                placeholder="Регион"
+                placeholder={t('events.region_placeholder')}
                 value={selectedRegionId}
                 onChange={onRegionChange}
                 onClear={() => onRegionChange(null)}
@@ -542,7 +543,7 @@ const Events: React.FC = () => {
 
             <div className="events-filter-group">
               <FilterSelect
-                placeholder="Категория"
+                placeholder={t('events.category_placeholder')}
                 value={selectedCategoryId}
                 onChange={onCategoryChange}
                 onClear={() => onCategoryChange(null)}
@@ -552,7 +553,7 @@ const Events: React.FC = () => {
 
             <div className="events-filter-group">
               <DatePicker
-                placeholder="Дата"
+                placeholder={t('events.date_placeholder')}
                 size="large"
                 style={{ width: '100%' }}
                 value={selectedDate ? dayjs(selectedDate) : null}
@@ -561,7 +562,7 @@ const Events: React.FC = () => {
             </div>
 
             <div className="events-filter-group events-sort-group">
-              <div className="events-sort-title">Сортиране</div>
+              <div className="events-sort-title">{t('events.sort_title')}</div>
               <div className="events-sort-list">
                 {(Object.keys(sortModeLabels) as EventSortMode[]).map((mode) => (
                   <Button
@@ -580,7 +581,7 @@ const Events: React.FC = () => {
             </div>
 
             <div className="events-filter-group">
-              <Button onClick={clearFilters}>Изчисти филтрите</Button>
+              <Button onClick={clearFilters}>{t('events.clear_filters')}</Button>
             </div>
           </div>
         </aside>
@@ -588,13 +589,13 @@ const Events: React.FC = () => {
         <div className="events-events-shell">
           <div className="events-page-head">
             <div>
-              <Title level={2} style={{ color: 'var(--text-primary)', marginBottom: 0 }}>Всички събития</Title>
-              <Paragraph style={{ color: 'var(--text-secondary)', marginBottom: 0 }}>Разгледай пълния календар и открий вълнуващи преживявания в твоя град.</Paragraph>
+              <Title level={2} style={{ color: 'var(--text-primary)', marginBottom: 0 }}>{t('events.title')}</Title>
+              <Paragraph style={{ color: 'var(--text-secondary)', marginBottom: 0 }}>{t('events.subtitle')}</Paragraph>
             </div>
 
             {canCreateEvent ? (
               <Button type="primary" icon={<PlusOutlined />} onClick={openCreateEditor} style={{ alignSelf: 'center' }}>
-                Добави събитие
+                {t('events.add_event')}
               </Button>
             ) : null}
           </div>
@@ -602,7 +603,7 @@ const Events: React.FC = () => {
           <div>
             {((isLoading || !hasRequested) && events.length === 0) ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '96px 0' }}>
-                <Spin size="large" description="Зареждане на събития..." />
+                <Spin size="large" description={t('events.loading')} />
               </div>
             ) : sortedEvents.length > 0 ? (
               <Row gutter={[24, 24]}>
@@ -640,7 +641,7 @@ const Events: React.FC = () => {
                         <div className="events-event-actions">
                           <Link to={routes.eventDetails} params={{ id: event.id }}>
                             <Button type="default" icon={<ArrowRightOutlined />}>
-                              Виж повече
+                              {t('events.see_more')}
                             </Button>
                           </Link>
 
@@ -654,17 +655,17 @@ const Events: React.FC = () => {
                         {canManageEvent ? (
                           <div className="events-event-admin-actions">
                             <Button type="default" icon={<EditOutlined />} onClick={() => openEditEditor(event)}>
-                              Редактирай
+                              {t('events.edit')}
                             </Button>
 
                             <Popconfirm
-                              title="Сигурен ли си, че искаш да изтриеш това събитие?"
-                              okText="Изтрий"
-                              cancelText="Отказ"
+                              title={t('events.delete_confirm')}
+                              okText={t('events.delete_ok')}
+                              cancelText={t('events.cancel')}
                               onConfirm={() => void deleteEvent(event)}
                             >
                               <Button danger icon={<DeleteOutlined />}>
-                                Изтрий
+                                {t('events.delete')}
                               </Button>
                             </Popconfirm>
                           </div>
@@ -697,12 +698,12 @@ const Events: React.FC = () => {
               </Row>
             ) : (
               <div style={{ textAlign: 'center', padding: '100px 0' }}>
-                <Title level={4} style={{ color: 'var(--text-secondary)' }}>Няма намерени събития по тези критерии.</Title>
+                <Title level={4} style={{ color: 'var(--text-secondary)' }}>{t('events.no_results')}</Title>
                 <Button
                   type="primary"
                   onClick={clearFilters}
                 >
-                  Изчисти филтрите
+                  {t('events.clear_filters')}
                 </Button>
               </div>
             )}
@@ -713,8 +714,8 @@ const Events: React.FC = () => {
 
       <EventEditorModal
         open={isEditorOpen}
-        title={editingEvent ? 'Редактиране на събитие' : 'Добавяне на събитие'}
-        confirmText={editingEvent ? 'Запази промените' : 'Добави събитие'}
+        title={editingEvent ? t('events.edit_editor_title') : t('events.add_editor_title')}
+        confirmText={editingEvent ? t('events.save_changes') : t('events.add_event')}
         loading={isCreating || isUpdating}
         event={editingEvent}
         regions={regions}

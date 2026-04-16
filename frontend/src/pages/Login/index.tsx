@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
 import { Button, Card, Form, Input, Segmented, Space, Typography, message } from 'antd';
 import { useUnit } from 'effector-react';
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { history } from '../../shared/routing';
 import { resetPasswordFx, signInFx, signUpFx, updatePasswordFx } from '../../entities/model';
 import { locationPromptRequested } from '../../entities/location/model';
@@ -22,6 +23,7 @@ type RecoveryFormValues = {
 const isValidationError = (error: unknown) => Boolean(error && typeof error === 'object' && 'errorFields' in error);
 
 const Login: React.FC = () => {
+  const { t } = useTranslation();
   const [authForm] = Form.useForm<AuthFormValues>();
   const [recoveryForm] = Form.useForm<RecoveryFormValues>();
   const [authMode, setAuthMode] = useState<AuthMode>('login');
@@ -64,12 +66,12 @@ const Login: React.FC = () => {
         });
 
         if (session) {
-          message.success('Регистрацията е успешна.');
+          message.success(t('auth.success_register'));
           locationPromptRequested();
           return;
         }
 
-        message.info('Регистрацията е успешна. Провери имейла си за потвърждение, ако е необходимо.');
+        message.info(t('auth.success_register_email'));
         locationPromptRequested();
         return;
       }
@@ -81,7 +83,7 @@ const Login: React.FC = () => {
 
       locationPromptRequested();
     } catch (error) {
-      message.error(error instanceof Error ? error.message : 'Входът не беше успешен.');
+      message.error(error instanceof Error ? error.message : t('auth.error_login'));
     }
   };
 
@@ -90,7 +92,7 @@ const Login: React.FC = () => {
       const values = await authForm.validateFields(['email']);
 
       if (typeof window === 'undefined') {
-        throw new Error('Неуспешно изпращане на линк за възстановяване.');
+        throw new Error(t('auth.error_recovery_send'));
       }
 
       await resetPassword({
@@ -98,13 +100,13 @@ const Login: React.FC = () => {
         redirectTo: `${window.location.origin}/login?mode=recovery`,
       });
 
-      message.success('Изпратихме линк за възстановяване на паролата на този имейл.');
+      message.success(t('auth.success_recovery_sent'));
     } catch (error) {
       if (isValidationError(error)) {
         return;
       }
 
-      message.error(error instanceof Error ? error.message : 'Неуспешно изпращане на линк за възстановяване.');
+      message.error(error instanceof Error ? error.message : t('auth.error_recovery_send'));
     }
   };
 
@@ -114,10 +116,10 @@ const Login: React.FC = () => {
         password: values.newPassword,
       });
 
-      message.success('Новата парола е записана успешно.');
+      message.success(t('auth.success_password_updated'));
       history.push('/');
     } catch (error) {
-      message.error(error instanceof Error ? error.message : 'Неуспешна смяна на паролата.');
+      message.error(error instanceof Error ? error.message : t('auth.error_password_update'));
     }
   };
 
@@ -128,50 +130,50 @@ const Login: React.FC = () => {
           <Space orientation="vertical" size="large" style={{ width: '100%' }}>
             <div>
               <Typography.Title level={2} style={{ marginBottom: 8, color: 'var(--text-primary)' }}>
-                Възстановяване на парола
+                {t('auth.recovery_title')}
               </Typography.Title>
               <Typography.Paragraph style={{ marginBottom: 0, color: 'var(--text-secondary)' }}>
-                Въведи новата си парола и я потвърди, за да завършиш възстановяването.
+                {t('auth.recovery_subtitle')}
               </Typography.Paragraph>
             </div>
 
             <Form form={recoveryForm} layout="vertical" requiredMark={false} onFinish={handleRecoverySubmit}>
               <Form.Item
-                label="Нова парола"
+                label={t('auth.new_password_label')}
                 name="newPassword"
                 rules={[
-                  { required: true, message: 'Въведи нова парола.' },
-                  { min: 6, message: 'Паролата трябва да е поне 6 символа.' },
+                  { required: true, message: t('forms.validation.required') },
+                  { min: 6, message: t('forms.validation.password_min') },
                 ]}
               >
                 <Input.Password
                   prefix={<LockOutlined />}
-                  placeholder="Минимум 6 символа"
+                  placeholder={t('auth.password_placeholder')}
                   autoComplete="new-password"
                   size="large"
                 />
               </Form.Item>
 
               <Form.Item
-                label="Потвърди новата парола"
+                label={t('auth.confirm_new_password_label')}
                 name="confirmPassword"
                 dependencies={['newPassword']}
                 rules={[
-                  { required: true, message: 'Потвърди новата парола.' },
+                  { required: true, message: t('forms.validation.required') },
                   ({ getFieldValue }) => ({
                     validator(_, value) {
                       if (!value || getFieldValue('newPassword') === value) {
                         return Promise.resolve();
                       }
 
-                      return Promise.reject(new Error('Паролите не съвпадат.'));
+                      return Promise.reject(new Error(t('forms.validation.password_mismatch')));
                     },
                   }),
                 ]}
               >
                 <Input.Password
                   prefix={<LockOutlined />}
-                  placeholder="Още веднъж новата парола"
+                  placeholder={t('auth.confirm_password_placeholder')}
                   autoComplete="new-password"
                   size="large"
                 />
@@ -179,11 +181,11 @@ const Login: React.FC = () => {
 
               <Space orientation="vertical" size="small" style={{ width: '100%' }}>
                 <Button type="primary" htmlType="submit" block size="large" loading={isUpdatingPassword}>
-                  Запази новата парола
+                  {t('auth.save_new_password')}
                 </Button>
 
                 <Button type="link" htmlType="button" block onClick={() => history.push('/login')}>
-                  Обратно към вход и регистрация
+                  {t('auth.back_to_auth')}
                 </Button>
               </Space>
             </Form>
@@ -199,12 +201,12 @@ const Login: React.FC = () => {
         <Space orientation="vertical" size="large" style={{ width: '100%' }}>
           <div>
             <Typography.Title level={2} style={{ marginBottom: 8, color: 'var(--text-primary)' }}>
-              {authMode === 'login' ? 'Вход' : 'Регистрация'}
+              {authMode === 'login' ? t('auth.login_title') : t('auth.register_title')}
             </Typography.Title>
             <Typography.Paragraph style={{ marginBottom: 0, color: 'var(--text-secondary)' }}>
               {authMode === 'login'
-                ? 'Влез в профила си, за да използваш всички функции.'
-                : 'Създай нов акаунт и отключи персонализацията, харесванията и уведомленията.'}
+                ? t('auth.login_subtitle')
+                : t('auth.register_subtitle')}
             </Typography.Paragraph>
           </div>
 
@@ -214,39 +216,39 @@ const Login: React.FC = () => {
             value={authMode}
             onChange={handleAuthModeChange}
             options={[
-              { label: 'Вход', value: 'login' },
-              { label: 'Регистрация', value: 'register' },
+              { label: t('auth.login_title'), value: 'login' },
+              { label: t('auth.register_title'), value: 'register' },
             ]}
           />
 
           <Form form={authForm} layout="vertical" requiredMark={false} onFinish={handleAuthSubmit}>
             <Form.Item
-              label="Email"
+              label={t('forms.email')}
               name="email"
               rules={[
-                { required: true, message: 'Въведи email адрес.' },
-                { type: 'email', message: 'Въведи валиден email адрес.' },
+                { required: true, message: t('forms.validation.email_required') },
+                { type: 'email', message: t('forms.validation.email_invalid') },
               ]}
             >
               <Input
                 prefix={<MailOutlined />}
-                placeholder="example@culturo.bg"
+                placeholder={t('auth.email_placeholder')}
                 autoComplete="email"
                 size="large"
               />
             </Form.Item>
 
             <Form.Item
-              label="Парола"
+              label={t('forms.password')}
               name="password"
               rules={[
-                { required: true, message: 'Въведи парола.' },
-                { min: 6, message: 'Паролата трябва да е поне 6 символа.' },
+                { required: true, message: t('forms.validation.password_required') },
+                { min: 6, message: t('forms.validation.password_min') },
               ]}
             >
               <Input.Password
                 prefix={<LockOutlined />}
-                placeholder="Минимум 6 символа"
+                placeholder={t('auth.password_placeholder')}
                 autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
                 size="large"
               />
@@ -254,25 +256,25 @@ const Login: React.FC = () => {
 
             {authMode === 'register' && (
               <Form.Item
-                label="Потвърди паролата"
+                label={t('auth.confirm_new_password_label')}
                 name="confirmPassword"
                 dependencies={['password']}
                 rules={[
-                  { required: true, message: 'Потвърди паролата.' },
+                  { required: true, message: t('forms.validation.required') },
                   ({ getFieldValue }) => ({
                     validator(_, value) {
                       if (!value || getFieldValue('password') === value) {
                         return Promise.resolve();
                       }
 
-                      return Promise.reject(new Error('Паролите не съвпадат.'));
+                      return Promise.reject(new Error(t('forms.validation.password_mismatch')));
                     },
                   }),
                 ]}
               >
                 <Input.Password
                   prefix={<LockOutlined />}
-                  placeholder="Повтори паролата"
+                  placeholder={t('auth.confirm_password_placeholder')}
                   autoComplete="new-password"
                   size="large"
                 />
@@ -287,12 +289,12 @@ const Login: React.FC = () => {
                 size="large"
                 loading={authMode === 'login' ? isSigningIn : isSigningUp}
               >
-                {authMode === 'login' ? 'Вход' : 'Регистрация'}
+                {authMode === 'login' ? t('auth.login_title') : t('auth.register_title')}
               </Button>
 
               {authMode === 'login' && (
                 <Button type="link" htmlType="button" block onClick={handleForgotPassword} loading={isResettingPassword}>
-                  Забравена парола
+                  {t('auth.forgot_password')}
                 </Button>
               )}
             </Space>

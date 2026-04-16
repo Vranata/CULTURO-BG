@@ -1,8 +1,5 @@
-import React, { useEffect } from 'react';
-import dayjs, { type Dayjs } from 'dayjs';
-import customParseFormat from 'dayjs/plugin/customParseFormat';
-import { Alert, Button, Col, DatePicker, Form, Input, Modal, Row, Select, TimePicker } from 'antd';
 import type { FilterOption, EventEditorValues, EventItem } from '../entities/events/model';
+import { useTranslation } from 'react-i18next';
 
 dayjs.extend(customParseFormat);
 
@@ -57,6 +54,7 @@ const EventEditorModal: React.FC<EventEditorModalProps> = ({
   onCancel,
   onSubmit,
 }) => {
+  const { t } = useTranslation();
   const [form] = Form.useForm<EventEditorFormValues>();
   const startDate = Form.useWatch('startDate', form);
   const endDate = Form.useWatch('endDate', form);
@@ -95,7 +93,7 @@ const EventEditorModal: React.FC<EventEditorModalProps> = ({
       open={open}
       title={title}
       okText={confirmText}
-      cancelText="Отказ"
+      cancelText={t('events.cancel')}
       confirmLoading={loading}
       onOk={() => form.submit()}
       onCancel={onCancel}
@@ -118,55 +116,55 @@ const EventEditorModal: React.FC<EventEditorModalProps> = ({
         initialValues={buildInitialValues(event)}
       >
         <Form.Item
-          label="Име"
+          label={t('forms.labels.name')}
           name="name"
           rules={[
-            { required: true, message: 'Въведи име на събитието.' },
-            { max: 120, message: 'Името трябва да е до 120 символа.' },
+            { required: true, message: t('forms.validation.name_required') },
+            { max: 120, message: t('forms.validation.name_max') },
           ]}
         >
-          <Input placeholder="Например: Лятна рок вечер" />
+          <Input placeholder={t('forms.placeholders.name')} />
         </Form.Item>
 
         <Form.Item
-          label="Място"
+          label={t('forms.labels.place')}
           name="place"
           rules={[
-            { required: true, message: 'Въведи място на събитието.' },
-            { max: 120, message: 'Мястото трябва да е до 120 символа.' },
+            { required: true, message: t('forms.validation.place_required') },
+            { max: 120, message: t('forms.validation.place_max') },
           ]}
         >
-          <Input placeholder="Например: Летен театър" />
+          <Input placeholder={t('forms.placeholders.place')} />
         </Form.Item>
 
         <Form.Item
-          label="Изпълнител / организатор"
+          label={t('forms.labels.artist')}
           name="artist"
           rules={[
-            { required: true, message: 'Въведи изпълнител или организатор.' },
-            { max: 120, message: 'Полето трябва да е до 120 символа.' },
+            { required: true, message: t('forms.validation.artist_required') },
+            { max: 120, message: t('forms.validation.artist_max') },
           ]}
         >
-          <Input placeholder="Например: The Horizon Band" />
+          <Input placeholder={t('forms.placeholders.artist')} />
         </Form.Item>
 
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
-              label="Град"
+              label={t('forms.labels.region')}
               name="regionId"
-              rules={[{ required: true, message: 'Избери град.' }]}
+              rules={[{ required: true, message: t('forms.validation.region_required') }]}
             >
-              <Select placeholder="Избери град" options={regions} />
+              <Select placeholder={t('forms.placeholders.region')} options={regions} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item
-              label="Категория"
+              label={t('forms.labels.category')}
               name="categoryId"
-              rules={[{ required: true, message: 'Избери категория.' }]}
+              rules={[{ required: true, message: t('forms.validation.category_required') }]}
             >
-              <Select placeholder="Избери категория" options={categories} />
+              <Select placeholder={t('forms.placeholders.category')} options={categories} />
             </Form.Item>
           </Col>
         </Row>
@@ -174,9 +172,9 @@ const EventEditorModal: React.FC<EventEditorModalProps> = ({
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
-              label="Начална дата"
+              label={t('forms.labels.start_date')}
               name="startDate"
-              rules={[{ required: true, message: 'Избери начална дата.' }]}
+              rules={[{ required: true, message: t('forms.validation.start_date_required') }]}
             >
               <DatePicker
                 style={{ width: '100%' }}
@@ -186,11 +184,11 @@ const EventEditorModal: React.FC<EventEditorModalProps> = ({
           </Col>
           <Col xs={24} md={12}>
             <Form.Item
-              label="Крайна дата"
+              label={t('forms.labels.end_date')}
               name="endDate"
               dependencies={['startDate']}
               rules={[
-                { required: true, message: 'Избери крайна дата.' },
+                { required: true, message: t('forms.validation.end_date_required') },
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     const selectedStartDate = getFieldValue('startDate') as Dayjs | null;
@@ -200,7 +198,7 @@ const EventEditorModal: React.FC<EventEditorModalProps> = ({
                     }
 
                     if (value.isBefore(selectedStartDate, 'day')) {
-                      return Promise.reject(new Error('Крайната дата трябва да е след началната.'));
+                      return Promise.reject(new Error(t('forms.validation.end_date_after')));
                     }
 
                     return Promise.resolve();
@@ -225,20 +223,20 @@ const EventEditorModal: React.FC<EventEditorModalProps> = ({
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
-              label="Начален час"
+              label={t('forms.labels.start_hour')}
               name="startHour"
-              rules={[{ required: true, message: 'Избери начален час.' }]}
+              rules={[{ required: true, message: t('forms.validation.start_hour_required') }]}
             >
               <TimePicker style={{ width: '100%' }} format="HH:mm" minuteStep={5} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item
-              label="Краен час"
+              label={t('forms.labels.end_hour')}
               name="endHour"
               dependencies={['startDate', 'endDate', 'startHour']}
               rules={[
-                { required: true, message: 'Избери краен час.' },
+                { required: true, message: t('forms.validation.end_hour_required') },
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     const selectedStartDate = getFieldValue('startDate') as Dayjs | null;
@@ -250,7 +248,7 @@ const EventEditorModal: React.FC<EventEditorModalProps> = ({
                     }
 
                     if (selectedStartDate.isSame(selectedEndDate, 'day') && !value.isAfter(selectedStartHour)) {
-                      return Promise.reject(new Error('Крайният час трябва да е след началния.'));
+                      return Promise.reject(new Error(t('forms.validation.end_hour_after')));
                     }
 
                     return Promise.resolve();
@@ -264,14 +262,14 @@ const EventEditorModal: React.FC<EventEditorModalProps> = ({
         </Row>
 
         <Form.Item
-          label="Описание"
+          label={t('forms.labels.description')}
           name="description"
           rules={[
-            { required: true, message: 'Въведи описание.' },
-            { max: 500, message: 'Описанието трябва да е до 500 символа.' },
+            { required: true, message: t('forms.validation.description_required') },
+            { max: 500, message: t('forms.validation.description_max') },
           ]}
         >
-          <Input.TextArea rows={4} placeholder="Кратко описание на събитието" />
+          <Input.TextArea rows={4} placeholder={t('forms.placeholders.description')} />
         </Form.Item>
 
         <Button type="primary" htmlType="submit" style={{ display: 'none' }} />

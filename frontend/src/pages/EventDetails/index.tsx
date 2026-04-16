@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { ArrowLeftOutlined, CalendarOutlined, EnvironmentOutlined, TagOutlined } from '@ant-design/icons';
+import { Button, Card, Col, Divider, Row, Space, Spin, Tag, Typography } from 'antd';
 import { useUnit } from 'effector-react';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'atomic-router-react';
-import { Button, Typography, Space, Tag, Divider, Row, Col, Card, Spin } from 'antd';
-import { CalendarOutlined, EnvironmentOutlined, ArrowLeftOutlined, TagOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import 'dayjs/locale/bg';
-
-dayjs.locale('bg');
+// dayjs locale is handled in App.tsx or inside the component based on i18n
 import EventLikeButton from '../../components/EventLikeButton';
 import { routes } from '../../shared/routing';
 import { $currentEvent, $isDetailLoading, clearLikedEventIds, eventDetailsOpened, fetchLikedEventIdsFx } from '../../entities/events/model';
@@ -15,6 +14,7 @@ import { $user } from '../../entities/model';
 const { Title, Paragraph, Text } = Typography;
 
 const EventDetails: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const params = useUnit(routes.eventDetails.$params);
   const eventId = params?.id;
 
@@ -73,7 +73,7 @@ const EventDetails: React.FC = () => {
   if (((isLoading || !hasRequested) && !currentEvent)) {
     return (
       <div style={{ maxWidth: '1200px', margin: '40px auto', padding: '0 24px', display: 'flex', justifyContent: 'center' }}>
-        <Spin size="large" description="Зареждане на събитието..." />
+        <Spin size="large" description={t('details.loading')} />
       </div>
     );
   }
@@ -81,9 +81,9 @@ const EventDetails: React.FC = () => {
   if (!currentEvent) {
     return (
       <div style={{ maxWidth: '1200px', margin: '40px auto', padding: '0 24px', textAlign: 'center', color: 'var(--text-primary)' }}>
-        <Title level={2} style={{ color: 'var(--text-primary)' }}>Събитието не е намерено</Title>
+        <Title level={2} style={{ color: 'var(--text-primary)' }}>{t('details.not_found')}</Title>
         <Link to={routes.events}>
-          <Button type="primary">Назад към списъка</Button>
+          <Button type="primary">{t('details.back_to_list')}</Button>
         </Link>
       </div>
     );
@@ -96,7 +96,7 @@ const EventDetails: React.FC = () => {
           icon={<ArrowLeftOutlined />}
           style={{ marginBottom: '24px' }}
         >
-          Назад към списъка
+          {t('details.back_to_list')}
         </Button>
       </Link>
 
@@ -124,7 +124,7 @@ const EventDetails: React.FC = () => {
 
             <Divider />
 
-            <Title level={3} style={{ color: 'var(--text-primary)' }}>Относно събитието</Title>
+            <Title level={3} style={{ color: 'var(--text-primary)' }}>{t('details.about_title')}</Title>
             <Paragraph style={{ fontSize: '1.1rem', lineHeight: '1.8', color: 'var(--text-secondary)' }}>
               {currentEvent.description}
             </Paragraph>
@@ -133,48 +133,50 @@ const EventDetails: React.FC = () => {
 
         <Col xs={24} lg={8}>
           <Card variant="borderless" style={{ background: 'var(--surface-bg)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-soft)', position: 'sticky', top: '100px' }}>
-            <Title level={4} style={{ color: 'var(--text-primary)' }}>Детайли от базата</Title>
+            <Title level={4} style={{ color: 'var(--text-primary)' }}>{t('details.info_title')}</Title>
             <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
               <div>
-                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Изпълнител / организатор:</Text>
+                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>{t('details.artist_label')}</Text>
                 <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>{currentEvent.artist}</Text>
               </div>
               <div>
-                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Място:</Text>
+                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>{t('details.place_label')}</Text>
                 <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>{currentEvent.place}</Text>
               </div>
               <div>
-                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Дата:</Text>
+                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>{t('details.date_label')}</Text>
                 <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>{currentEvent.date}</Text>
               </div>
               <div>
-                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Регион:</Text>
+                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>{t('details.region_label')}</Text>
                 <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>{currentEvent.region}</Text>
               </div>
               <div>
-                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Категория:</Text>
+                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>{t('details.category_label')}</Text>
                 <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>{currentEvent.category}</Text>
               </div>
               <div>
-                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Начало:</Text>
+                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>{t('details.start_label')}</Text>
                 <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                  {dayjs(currentEvent.startDate).format('D MMMM YYYY')} г.{currentEvent.startHour ? `, ${currentEvent.startHour.substring(0, 5)} ч.` : ''}
+                  {dayjs(currentEvent.startDate).locale(i18n.language.startsWith('en') ? 'en' : 'bg').format(t('formats.date'))}
+                  {currentEvent.startHour ? `, ${currentEvent.startHour.substring(0, 5)} ${t('details.hour_suffix')}` : ''}
                 </Text>
               </div>
               <div>
-                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>Край:</Text>
+                <Text style={{ display: 'block', color: 'var(--text-secondary)' }}>{t('details.end_label')}</Text>
                 <Text strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                  {dayjs(currentEvent.endDate).format('D MMMM YYYY')} г.{currentEvent.endHour ? `, ${currentEvent.endHour.substring(0, 5)} ч.` : ''}
+                  {dayjs(currentEvent.endDate).locale(i18n.language.startsWith('en') ? 'en' : 'bg').format(t('formats.date'))}
+                  {currentEvent.endHour ? `, ${currentEvent.endHour.substring(0, 5)} ${t('details.hour_suffix')}` : ''}
                 </Text>
               </div>
 
               <EventLikeButton eventId={currentEvent.id} block />
               <Divider />
               <Button type="primary" block size="large">
-                Запази събитието
+                {t('details.save_event')}
               </Button>
               <div style={{ textAlign: 'center', marginTop: '12px' }}>
-                <Text type="secondary" style={{ fontSize: '11px', opacity: 0.6 }}>Референтен номер: {currentEvent.id}</Text>
+                <Text type="secondary" style={{ fontSize: '11px', opacity: 0.6 }}>{t('details.ref_number')} {currentEvent.id}</Text>
               </div>
             </Space>
           </Card>

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useUnit } from 'effector-react';
 import { Typography, Row, Col, Card, Tag, Button } from 'antd';
 import { EnvironmentOutlined, CalendarOutlined, ArrowRightOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'atomic-router-react';
 import Hero from './Hero';
 import { $featuredEvents, homePageOpened } from '../../entities/events/model';
@@ -10,6 +11,7 @@ import { routes } from '../../shared/routing';
 const { Title, Text } = Typography;
 
 const Home: React.FC = () => {
+  const { t } = useTranslation();
   const { featuredEvents, enterPage } = useUnit({
     featuredEvents: $featuredEvents,
     enterPage: homePageOpened,
@@ -27,11 +29,11 @@ const Home: React.FC = () => {
         <div style={{ marginTop: '64px' }}>
           <div className="home-section-header">
             <div>
-              <Title level={2} style={{ marginBottom: '8px', color: 'var(--text-primary)' }}>Избрано за вас</Title>
-              <Text type="secondary">Най-интересните предстоящи събития, подбрани специално за теб.</Text>
+              <Title level={2} style={{ marginBottom: '8px', color: 'var(--text-primary)' }}>{t('home.featured_title')}</Title>
+              <Text type="secondary">{t('home.featured_subtitle')}</Text>
             </div>
             <Link to={routes.events}>
-              <Button type="link" size="large" className="home-section-button">Виж всички събития <ArrowRightOutlined /></Button>
+              <Button type="link" size="large" className="home-section-button">{t('home.see_all')} <ArrowRightOutlined /></Button>
             </Link>
           </div>
 

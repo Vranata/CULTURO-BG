@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'atomic-router-react';
 import { Button, Card, Col, Empty, Row, Space, Spin, Typography, message } from 'antd';
 import { useUnit } from 'effector-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Link } from 'atomic-router-react';
 import { supabase } from '../../services/supabaseClient';
 import { routes } from '../../shared/routing';
 import EventSpotlightCard from '../../components/EventSpotlightCard';
@@ -55,6 +56,7 @@ const daysUntil = (event: EventItem) => {
 };
 
 const Recommended: React.FC = () => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [allEvents, setAllEvents] = useState<EventItem[]>([]);
   const [preferredCategoryIds, setPreferredCategoryIds] = useState<string[]>([]);
@@ -119,7 +121,7 @@ const Recommended: React.FC = () => {
 
       setPreferredCategoryIds(((preferenceRows ?? []) as PreferenceRow[]).map((row) => String(row.id_event_category)));
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : 'Неуспешно зареждане на препоръките.');
+      messageApi.error(error instanceof Error ? error.message : t('recommended.error_loading'));
       setAllEvents([]);
       resetLikedEvents();
       setPreferredCategoryIds([]);
@@ -149,23 +151,23 @@ const Recommended: React.FC = () => {
 
         if (effectiveRegionId !== null && event.regionId === effectiveRegionId) {
           score += 4;
-          reasonTags.push('В твоя регион');
+          reasonTags.push(t('recommended.reason_region'));
         }
 
         if (likedCategories.has(event.categoryId) || preferredCategories.has(String(event.categoryId))) {
           score += 3;
-          reasonTags.push('Твоя категория');
+          reasonTags.push(t('recommended.reason_category'));
         }
 
         const remainingDays = daysUntil(event);
 
         if (remainingDays !== null && remainingDays >= 0 && remainingDays <= 14) {
           score += 2;
-          reasonTags.push('Скоро предстои');
+          reasonTags.push(t('recommended.reason_soon'));
         }
 
         if (reasonTags.length === 0) {
-          reasonTags.push('Предстоящо');
+          reasonTags.push(t('recommended.reason_upcoming'));
         }
 
         return {
@@ -211,20 +213,20 @@ const Recommended: React.FC = () => {
 
       <Space orientation="vertical" size="large" style={{ width: '100%', marginBottom: '32px' }}>
         <div>
-          <Title level={2} style={{ color: 'var(--text-primary)', marginBottom: 8 }}>Препоръчано за теб</Title>
+          <Title level={2} style={{ color: 'var(--text-primary)', marginBottom: 8 }}>{t('recommended.title')}</Title>
           <Paragraph style={{ color: 'var(--text-secondary)', marginBottom: 0 }}>
-            Подреждаме събитията според твоя регион, харесвания и това, което предстои скоро.
+            {t('recommended.subtitle')}
           </Paragraph>
         </div>
 
         {!user ? (
           <Card variant="borderless" style={{ background: 'var(--surface-bg)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-soft)' }}>
             <Space orientation="vertical" size="small" style={{ width: '100%' }}>
-              <Text strong style={{ color: 'var(--text-primary)' }}>Персоналните препоръки работят най-добре с акаунт.</Text>
-              <Text style={{ color: 'var(--text-secondary)' }}>Влез или си направи акаунт, за да подреждаме събитията според твоя вкус.</Text>
+              <Text strong style={{ color: 'var(--text-primary)' }}>{t('recommended.guest_card_title')}</Text>
+              <Text style={{ color: 'var(--text-secondary)' }}>{t('recommended.guest_card_text')}</Text>
               <div>
                 <Link to={routes.login}>
-                  <Button type="primary">Вход / регистрация</Button>
+                  <Button type="primary">{t('auth.login_register')}</Button>
                 </Link>
               </div>
             </Space>
@@ -234,7 +236,7 @@ const Recommended: React.FC = () => {
 
       {isLoading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '96px 0' }}>
-          <Spin size="large" description="Зареждане на препоръки..." />
+          <Spin size="large" description={t('recommended.loading')} />
         </div>
       ) : recommendedEvents.length > 0 ? (
         <>
@@ -263,11 +265,11 @@ const Recommended: React.FC = () => {
         </>
       ) : (
         <Empty
-          description="Няма достатъчно данни за персонализирани препоръки в момента."
+          description={t('recommended.empty')}
           style={{ padding: '96px 0' }}
         >
           <Link to={routes.events}>
-            <Button type="primary">Разгледай всички събития</Button>
+            <Button type="primary">{t('recommended.view_all')}</Button>
           </Link>
         </Empty>
       )}

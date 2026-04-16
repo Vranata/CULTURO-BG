@@ -1,5 +1,5 @@
-import React from 'react';
 import { Typography, Button, Space } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useUnit } from 'effector-react';
 import { CalendarOutlined, ClockCircleOutlined, CompassOutlined, FireOutlined } from '@ant-design/icons';
 import { routes } from '../../shared/routing';
@@ -14,6 +14,7 @@ import {
 const { Title, Paragraph } = Typography;
 
 const Hero: React.FC = () => {
+  const { t } = useTranslation();
   const { 
     featuredEvents, 
     regions, 
@@ -41,12 +42,12 @@ const Hero: React.FC = () => {
   return (
     <div className="home-hero">
       <div className="home-hero-copy">
-        <div className="home-hero-kicker">CULTURO BG · ИЗБРАНО ДНЕС</div>
+        <div className="home-hero-kicker">{t('home.hero.kicker')}</div>
         <Title level={1} className="home-hero-title">
-          Културният пулс на твоя град в един афиш.
+          {t('home.hero.title')}
         </Title>
         <Paragraph className="home-hero-text">
-          Откривай, планирай и преживявай най-интересните събития – от камерни концерти до мащабни фестивали. Твоят персонализиран пътеводител в света на културата.
+          {t('home.hero.text')}
         </Paragraph>
 
         <div className="home-hero-actions">
@@ -57,11 +58,11 @@ const Hero: React.FC = () => {
             className="home-hero-primary"
             onClick={() => routes.events.open()}
           >
-            Виж събитията
+            {t('home.hero.view_events')}
           </Button>
         </div>
 
-        <div className="home-hero-rail" aria-label="Категории">
+        <div className="home-hero-rail" aria-label={t('home.hero.categories_label')}>
           {categories.slice(0, 5).map((cat) => (
             <span 
               key={cat.value} 
@@ -74,7 +75,7 @@ const Hero: React.FC = () => {
           ))}
         </div>
 
-        <div className="home-hero-cities" aria-label="Градове">
+        <div className="home-hero-cities" aria-label={t('home.hero.cities_label')}>
           {regions.slice(0, 6).map((reg) => (
             <span 
               key={reg.value} 
@@ -92,13 +93,13 @@ const Hero: React.FC = () => {
         <div className="home-hero-spotlight-orb" />
         <div className="home-hero-spotlight-card">
           <div className="home-hero-spotlight-pill">
-            <FireOutlined /> Актуално сега
+            <FireOutlined /> {t('home.hero.trending_now')}
           </div>
           <Title level={4} style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>
-            {featuredEvents.length > 0 ? 'Твоят афиш за днес' : 'Предстоящи събития'}
+            {featuredEvents.length > 0 ? t('home.hero.spotlight_title_today') : t('home.hero.spotlight_title_upcoming')}
           </Title>
           <Paragraph style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-            Подбрани предложения от програмата, които не искаш да изпуснеш.
+            {t('home.hero.spotlight_subtitle')}
           </Paragraph>
 
           <div className="home-hero-spotlight-schedule">
@@ -121,14 +122,14 @@ const Hero: React.FC = () => {
               ))
             ) : (
               <div style={{ padding: '20px 0', textAlign: 'center', opacity: 0.5 }}>
-                Няма активни събития в момента.
+                {t('home.hero.no_events')}
               </div>
             )}
           </div>
 
           <div className="home-hero-spotlight-footer">
-            <span><CompassOutlined /> Всички региони</span>
-            <span><CalendarOutlined /> Обновено днес</span>
+            <span><CompassOutlined /> {t('home.hero.all_regions')}</span>
+            <span><CalendarOutlined /> {t('home.hero.updated_today')}</span>
           </div>
         </div>
       </div>

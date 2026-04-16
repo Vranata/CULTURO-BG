@@ -18,6 +18,13 @@ import {
 import { history, routes } from './shared/routing';
 import { $isAuthenticated, $user, $isAdmin, signOutFx } from './entities/model';
 import UserUpgradePopover from './components/UserUpgradePopover';
+import { useTranslation } from 'react-i18next';
+import bgBG from 'antd/locale/bg_BG';
+import enUS from 'antd/locale/en_US';
+import dayjs from 'dayjs';
+import 'dayjs/locale/bg';
+import 'dayjs/locale/en';
+import { TranslationOutlined } from '@ant-design/icons';
 import './theme.css';
 
 import Home from './pages/Home/index';
@@ -108,6 +115,7 @@ const App: React.FC = () => {
   const [themeMode, setThemeMode] = useState<ThemeMode>('light');
   const [selectedKey, setSelectedKey] = useState(() => getRouteKey(typeof window !== 'undefined' ? window.location.pathname : '/'));
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const { t, i18n } = useTranslation();
 
   const { isAuthenticated, signOut, user, isAdmin } = useUnit({
     isAuthenticated: $isAuthenticated,
@@ -122,25 +130,25 @@ const App: React.FC = () => {
         key: 'home',
         icon: <HomeOutlined />,
         to: routes.home,
-        label: 'Начало',
+        label: t('nav.home'),
       },
       {
         key: 'events',
         icon: <CalendarOutlined />,
         to: routes.events,
-        label: 'Всички събития',
+        label: t('nav.events'),
       },
       {
         key: 'recommended',
         icon: <StarOutlined />,
         to: routes.recommended,
-        label: 'Препоръчано за теб',
+        label: t('nav.recommended'),
       },
       {
         key: 'favorites',
         icon: <HeartOutlined />,
         to: routes.favorites,
-        label: 'Любими',
+        label: t('nav.favorites'),
       },
     ];
 
@@ -149,12 +157,12 @@ const App: React.FC = () => {
         key: 'admin-users',
         icon: <UserOutlined />,
         to: routes.adminUsers,
-        label: 'Управление',
+        label: t('nav.management'),
       });
     }
 
     return baseItems;
-  }, [isAdmin]);
+  }, [isAdmin, t]);
 
   const themeConfig = useMemo(() => getThemeConfig(themeMode), [themeMode]);
 
@@ -163,21 +171,28 @@ const App: React.FC = () => {
     setThemeMode(themeOrder[nextIndex]);
   };
 
+  const toggleLanguage = () => {
+    const newLang = i18n.language.startsWith('en') ? 'bg' : 'en';
+    i18n.changeLanguage(newLang);
+  };
+
   const themeIcon = themeMode === 'light' ? <MoonOutlined /> : themeMode === 'dark' ? <BgColorsOutlined /> : <SunOutlined />;
-  const themeTooltip = themeMode === 'light' ? 'Тъмна тема' : themeMode === 'dark' ? 'Оранжева тема' : 'Светла тема';
+  const themeTooltip = themeMode === 'light' ? t('theme.dark') : themeMode === 'dark' ? t('theme.orange') : t('theme.light');
 
   useEffect(() => {
     const unlisten = history.listen(({ location }) => {
       setSelectedKey(getRouteKey(location.pathname));
     });
 
+    dayjs.locale(i18n.language.startsWith('en') ? 'en' : 'bg');
+
     return () => {
       unlisten();
     };
-  }, []);
+  }, [i18n.language]);
 
   return (
-    <ConfigProvider theme={themeConfig}>
+    <ConfigProvider theme={themeConfig} locale={i18n.language.startsWith('en') ? enUS : bgBG}>
       <Layout className="layout" data-theme={themeMode} style={{ minHeight: '100vh', background: 'var(--page-bg)', position: 'relative', overflow: 'hidden' }}>
         <LocationInitializer />
 
@@ -220,7 +235,7 @@ const App: React.FC = () => {
             {isAuthenticated && user && <UserUpgradePopover user={user} />}
 
             {isAuthenticated ? (
-              <Tooltip title="Изход">
+              <Tooltip title={t('auth.logout')}>
                 <Button
                   shape="circle"
                   type="text"
@@ -237,7 +252,7 @@ const App: React.FC = () => {
                 />
               </Tooltip>
             ) : (
-              <Tooltip title="Вход">
+              <Tooltip title={t('auth.login')}>
                 <Link to={routes.login} style={{ display: 'inline-flex', marginLeft: 12 }}>
                   <Button
                     shape="circle"
@@ -260,6 +275,22 @@ const App: React.FC = () => {
                 type="text"
                 onClick={cycleTheme}
                 icon={themeIcon}
+                style={{
+                  width: 34,
+                  height: 34,
+                  marginLeft: 12,
+                  color: 'var(--toggle-fg)',
+                  background: 'var(--toggle-bg)',
+                  border: '1px solid var(--toggle-border)',
+                }}
+              />
+            </Tooltip>
+            <Tooltip title={i18n.language.startsWith('en') ? 'Български' : 'English'}>
+              <Button
+                shape="circle"
+                type="text"
+                onClick={toggleLanguage}
+                icon={<TranslationOutlined />}
                 style={{
                   width: 34,
                   height: 34,
@@ -316,11 +347,11 @@ const App: React.FC = () => {
           }}
         >
           <div style={{ marginBottom: '12px', color: 'var(--header-text)' }}>CULTURO BG</div>
-          ©{new Date().getFullYear()} Created for Diploma Project • Итеративен модел на разработка
+          ©{new Date().getFullYear()} {t('footer.created_for')}
         </Footer>
 
         <Drawer
-          title="Меню"
+          title={t('nav.menu')}
           placement="right"
           onClose={() => setIsMobileDrawerOpen(false)}
           open={isMobileDrawerOpen}
@@ -361,7 +392,7 @@ const App: React.FC = () => {
                   onClick={() => { signOut(); setIsMobileDrawerOpen(false); }}
                   style={{ borderRadius: '12px' }}
                 >
-                  Изход
+                  {t('auth.logout')}
                 </Button>
               ) : (
                 <Link to={routes.login} onClick={() => setIsMobileDrawerOpen(false)}>
@@ -372,10 +403,19 @@ const App: React.FC = () => {
                     icon={<LoginOutlined />}
                     style={{ borderRadius: '12px' }}
                   >
-                    Вход
+                    {t('auth.login')}
                   </Button>
                 </Link>
               )}
+              <Button 
+                block 
+                size="large" 
+                icon={<TranslationOutlined />} 
+                onClick={toggleLanguage}
+                style={{ borderRadius: '12px', background: 'var(--toggle-bg)', color: 'var(--toggle-fg)', border: '1px solid var(--toggle-border)', marginTop: -8 }}
+              >
+                {i18n.language.startsWith('en') ? 'Български' : 'English'}
+              </Button>
             </div>
           </div>
         </Drawer>

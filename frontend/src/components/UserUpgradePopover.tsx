@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Form, Input, Modal, Popover, Radio, Select, Space, Typography, message } from 'antd';
 import { useUnit } from 'effector-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { AppUser } from '../entities/model';
 import { $categoryOptions, fetchCategoriesFx } from '../entities/events/model';
 import { $isLocationPromptOpen } from '../entities/location/model';
@@ -26,6 +27,7 @@ type UserUpgradePopoverProps = {
 };
 
 const UserUpgradePopover: React.FC<UserUpgradePopoverProps> = ({ user, variant = 'horizontal' }) => {
+  const { t } = useTranslation();
   const [form] = Form.useForm<UpgradeRequestValues>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -185,7 +187,7 @@ const UserUpgradePopover: React.FC<UserUpgradePopoverProps> = ({ user, variant =
       }).select('id_request').single();
 
       if (error || !requestRow) {
-        throw new Error(`Грешка при записване на заявката: ${extractErrorMessage(error, 'Неизвестна грешка при записване.')}`);
+        throw new Error(t('profile.error_save_request', { error: extractErrorMessage(error, t('common.error_unknown')) }));
       }
 
       const requestPayloadExt = {
@@ -209,17 +211,17 @@ const UserUpgradePopover: React.FC<UserUpgradePopoverProps> = ({ user, variant =
       if (!response.ok) {
         try {
           const parsedResponse = JSON.parse(responseText) as { error?: unknown; details?: unknown };
-          throw new Error(`Грешка при изпращане на имейла: ${extractErrorMessage(parsedResponse.details ?? parsedResponse.error ?? responseText, 'Неизвестна грешка при изпращане.')}`);
+          throw new Error(t('profile.error_send_email', { error: extractErrorMessage(parsedResponse.details ?? parsedResponse.error ?? responseText, t('common.error_unknown')) }));
         } catch {
-          throw new Error(`Грешка при изпращане на имейла: ${responseText || `HTTP ${response.status}`}`);
+          throw new Error(t('profile.error_send_email', { error: responseText || `HTTP ${response.status}` }));
         }
       }
 
-      message.success('Заявката е записана и е изпратена за одобрение на администратора.');
+      message.success(t('profile.success_upgrade_request'));
       setIsModalOpen(false);
       form.resetFields();
     } catch (error) {
-      message.error(extractErrorMessage(error, 'Неуспешно изпращане на заявката.'));
+      message.error(extractErrorMessage(error, t('profile.error_submit')));
     } finally {
       setIsSubmitting(false);
     }
@@ -228,13 +230,13 @@ const UserUpgradePopover: React.FC<UserUpgradePopoverProps> = ({ user, variant =
   const content = (
     <div style={{ maxWidth: 260 }}>
       <Typography.Title level={5} style={{ marginBottom: 8, color: 'var(--text-primary)' }}>
-        Стани Special User
+        {t('profile.upgrade_title')}
       </Typography.Title>
       <Typography.Paragraph style={{ marginBottom: 12, color: 'var(--text-secondary)' }}>
-        Изпрати кратка заявка и тя ще бъде прегледана от администратора.
+        {t('profile.upgrade_subtitle')}
       </Typography.Paragraph>
       <Button type="primary" block onClick={handleOpenModal}>
-        Upgrade to Special User
+        {t('profile.upgrade_btn')}
       </Button>
     </div>
   );
@@ -255,13 +257,13 @@ const UserUpgradePopover: React.FC<UserUpgradePopoverProps> = ({ user, variant =
         content={
           <div style={{ maxWidth: 260 }}>
             <Typography.Title level={5} style={{ marginBottom: 8, color: 'var(--text-primary)' }}>
-              Настройки
+              {t('profile.settings_title')}
             </Typography.Title>
             <Typography.Paragraph style={{ marginBottom: 12, color: 'var(--text-secondary)' }}>
-              Прегледай профила си, смени името, имейла, паролата и предпочитанията си.
+              {t('profile.settings_subtitle')}
             </Typography.Paragraph>
             <Button type="primary" block onClick={handleOpenSettings}>
-              Отвори профил
+              {t('profile.open_profile')}
             </Button>
           </div>
         }
@@ -345,9 +347,9 @@ const UserUpgradePopover: React.FC<UserUpgradePopoverProps> = ({ user, variant =
 
       <Modal
         open={isModalOpen}
-        title="Заявка за Upgrade към Special User"
-        okText="Изпрати"
-        cancelText="Отказ"
+        title={t('profile.upgrade_modal_title')}
+        okText={t('forms.send')}
+        cancelText={t('common.cancel')}
         destroyOnHidden
         confirmLoading={isSubmitting}
         onCancel={handleCloseModal}
@@ -355,45 +357,45 @@ const UserUpgradePopover: React.FC<UserUpgradePopoverProps> = ({ user, variant =
       >
         <Form form={form} layout="vertical" requiredMark={false} onFinish={handleSubmit}>
           <Form.Item
-            label="Име (на фирма или човек)"
+            label={t('profile.applicant_name_label')}
             name="applicantName"
-            rules={[{ required: true, message: 'Въведи име на фирма или човек.' }]}
+            rules={[{ required: true, message: t('forms.validation.required') }]}
           >
-            <Input placeholder="Име на фирма или човек" size="large" />
+            <Input placeholder={t('profile.applicant_name_placeholder')} size="large" />
           </Form.Item>
 
           <Form.Item
-            label="Имейл"
+            label={t('profile.applicant_email_label')}
             name="applicantEmail"
             rules={[
-              { required: true, message: 'Въведи имейл адрес.' },
-              { type: 'email', message: 'Въведи валиден имейл адрес.' },
+              { required: true, message: t('forms.validation.email_required') },
+              { type: 'email', message: t('forms.validation.email_invalid') },
             ]}
           >
-            <Input placeholder="name@example.com" size="large" />
+            <Input placeholder={t('auth.email_placeholder')} size="large" />
           </Form.Item>
 
           <Form.Item
-            label="Специалност (категория)"
+            label={t('profile.specialty_label')}
             name="specialtyCategoryId"
-            rules={[{ required: true, message: 'Избери категория.' }]}
+            rules={[{ required: true, message: t('forms.validation.category_required') }]}
           >
             <Select
               size="large"
-              placeholder="Избери категория"
+              placeholder={t('forms.select_category')}
               options={specialtyOptions}
             />
           </Form.Item>
 
           <Form.Item
-            label="Тип заявител"
+            label={t('profile.applicant_type_label')}
             name="applicantType"
-            rules={[{ required: true, message: 'Избери тип заявител.' }]}
+            rules={[{ required: true, message: t('forms.validation.required') }]}
           >
             <Radio.Group>
               <Space orientation="horizontal" wrap>
-                <Radio value="person">Човек</Radio>
-                <Radio value="company">Фирма</Radio>
+                <Radio value="person">{t('profile.person')}</Radio>
+                <Radio value="company">{t('profile.company')}</Radio>
               </Space>
             </Radio.Group>
           </Form.Item>
@@ -413,11 +415,11 @@ const UserUpgradePopover: React.FC<UserUpgradePopoverProps> = ({ user, variant =
           </Form.Item>
 
           <Form.Item
-            label="Защо да получиш тази роля?"
+            label={t('profile.reason_label')}
             name="reason"
-            rules={[{ required: true, message: 'Опиши накратко мотивацията си.' }]}
+            rules={[{ required: true, message: t('forms.validation.required') }]}
           >
-            <TextArea rows={5} placeholder="Обясни защо да бъдеш Special User" />
+            <TextArea rows={5} placeholder={t('profile.reason_placeholder')} />
           </Form.Item>
         </Form>
       </Modal>

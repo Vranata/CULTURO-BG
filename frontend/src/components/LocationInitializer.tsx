@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
 import { Modal, message } from 'antd';
+import { useUnit } from 'effector-react';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { detectBulgarianRegionFromBrowserLocation, isLocationPermissionDeniedError } from '../shared/browserLocation';
 import {
   $detectedLocationRegion,
@@ -12,6 +14,7 @@ import {
 import { useUnit } from 'effector-react';
 
 const LocationInitializer: React.FC = () => {
+  const { t } = useTranslation();
   const [isResolving, setIsResolving] = useState(false);
   const { permissionState, detectedRegion, isPromptOpen, setPermissionState, setDetectedRegion, closePrompt } = useUnit({
     permissionState: $locationPermissionState,
@@ -32,20 +35,20 @@ const LocationInitializer: React.FC = () => {
       closePrompt();
 
       if (nextRegion) {
-        message.success(`Открихме локацията ти: ${nextRegion.regionName}.`);
+        message.success(t('location.success_detected', { region: nextRegion.regionName }));
       } else {
-        message.info('Локацията е разрешена, но не успяхме да определим областта.');
+        message.info(t('location.info_no_region'));
       }
     } catch (error) {
       if (isLocationPermissionDeniedError(error)) {
         setPermissionState('declined');
         closePrompt();
-        message.warning('Без достъп до локация ще показваме препоръки по профила ти или общо.');
+        message.warning(t('location.warning_declined'));
         return;
       }
 
       closePrompt();
-      message.error(error instanceof Error ? error.message : 'Не успяхме да определим локацията ти.');
+      message.error(error instanceof Error ? error.message : t('location.error_detection'));
     } finally {
       setIsResolving(false);
     }
@@ -73,9 +76,9 @@ const LocationInitializer: React.FC = () => {
   return (
     <Modal
       open={isPromptOpen && permissionState === 'unknown'}
-      title="Използване на местоположение"
-      okText="Разреши"
-      cancelText="Не сега"
+      title={t('location.prompt_title')}
+      okText={t('location.prompt_ok')}
+      cancelText={t('location.prompt_cancel')}
       confirmLoading={isResolving}
       onOk={() => void resolveLocation()}
       onCancel={() => {
@@ -87,7 +90,7 @@ const LocationInitializer: React.FC = () => {
       closable={false}
     >
       <div style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-        Ако разрешиш локация, ще показваме по-близките и препоръчаните събития според областта ти в България.
+        {t('location.prompt_text')}
       </div>
     </Modal>
   );

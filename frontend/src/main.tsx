@@ -5,6 +5,7 @@ import App from './App'
 import { router, history } from './shared/routing'
 import { checkSession, startAuthSyncFx } from './entities/model'
 import 'antd/dist/reset.css'
+import './shared/i18n'
 
 // 1. Set the history for the router
 router.setHistory(history)

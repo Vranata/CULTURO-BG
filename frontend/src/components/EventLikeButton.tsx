@@ -1,7 +1,8 @@
-import React from 'react';
-import { Button, Modal, message } from 'antd';
 import { HeartFilled, HeartOutlined } from '@ant-design/icons';
+import { Button, Modal, message } from 'antd';
 import { useUnit } from 'effector-react';
+import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { $likedEventIds, toggleEventLikeFx } from '../entities/events/model';
 import { $user } from '../entities/model';
 import { history } from '../shared/routing';
@@ -14,6 +15,7 @@ type EventLikeButtonProps = {
 };
 
 const EventLikeButton: React.FC<EventLikeButtonProps> = ({ eventId, compact = false, block = false, iconOnly = false }) => {
+  const { t } = useTranslation();
   const { user, likedEventIds, toggleLike, isToggling } = useUnit({
     user: $user,
     likedEventIds: $likedEventIds,
@@ -26,13 +28,13 @@ const EventLikeButton: React.FC<EventLikeButtonProps> = ({ eventId, compact = fa
   const handleClick = async () => {
     if (!user) {
       Modal.confirm({
-        title: 'Вход или регистрация',
+        title: t('events.like_modal_title'),
         centered: true,
-        okText: 'Вход / регистрация',
-        cancelText: 'Отказ',
+        okText: t('auth.login_register'),
+        cancelText: t('common.cancel'),
         content: (
           <div style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            За да харесваш събития, трябва да влезеш в профила си или да си направиш акаунт в CULTURO BG.
+            {t('events.like_modal_content')}
           </div>
         ),
         onOk: () => {
@@ -45,7 +47,7 @@ const EventLikeButton: React.FC<EventLikeButtonProps> = ({ eventId, compact = fa
     const userId = Number(user.id);
 
     if (Number.isNaN(userId)) {
-      message.error('Профилът не е синхронизиран. Презареди страницата.');
+      message.error(t('events.error_not_synced'));
       return;
     }
 
@@ -55,7 +57,7 @@ const EventLikeButton: React.FC<EventLikeButtonProps> = ({ eventId, compact = fa
         eventId,
       });
     } catch (error) {
-      message.error(error instanceof Error ? error.message : 'Неуспешно харесване на събитието.');
+      message.error(error instanceof Error ? error.message : t('events.error_like'));
     }
   };
 
@@ -69,8 +71,8 @@ const EventLikeButton: React.FC<EventLikeButtonProps> = ({ eventId, compact = fa
       loading={isToggling}
       block={block}
       size={compact ? 'small' : 'middle'}
-      title={isLiked ? 'Харесано' : 'Харесай'}
-      aria-label={isLiked ? 'Харесано' : 'Харесай'}
+      title={isLiked ? t('events.liked') : t('events.like')}
+      aria-label={isLiked ? t('events.liked') : t('events.like')}
       style={{
         width: iconOnly ? (compact ? 34 : 38) : undefined,
         minWidth: iconOnly ? (compact ? 34 : 38) : (compact ? 118 : 138),
@@ -83,7 +85,7 @@ const EventLikeButton: React.FC<EventLikeButtonProps> = ({ eventId, compact = fa
         boxShadow: isLiked ? '0 10px 24px rgba(24, 144, 255, 0.18)' : '0 8px 18px rgba(15, 23, 42, 0.06)',
       }}
     >
-      {iconOnly ? null : (isLiked ? 'Харесано' : 'Харесай')}
+      {iconOnly ? null : (isLiked ? t('events.liked') : t('events.like'))}
     </Button>
   );
 };

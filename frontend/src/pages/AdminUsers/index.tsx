@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { useUnit } from 'effector-react';
-import { Table, Typography, Button, Modal, Input, message, Tag, Space, Card, Alert } from 'antd';
 import { UserOutlined, WarningOutlined, ArrowLeftOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Input, Modal, Space, Table, Tag, Typography, message } from 'antd';
+import { useUnit } from 'effector-react';
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'atomic-router-react';
 import { $specialUsers, downgradeUserFx, type AppUser } from '../../entities/model';
 import { routes } from '../../shared/routing';
@@ -9,6 +10,7 @@ import { routes } from '../../shared/routing';
 const { Title, Text, Paragraph } = Typography;
 
 const AdminUsers: React.FC = () => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
@@ -37,16 +39,16 @@ const AdminUsers: React.FC = () => {
     
     try {
       await downgrade({ userId: selectedUser.id, confirmEmail });
-      messageApi.success(`Потребителят ${selectedUser.email} беше успешно понижен.`);
+      messageApi.success(t('admin.success_downgrade', { email: selectedUser.email }));
       handleCancel();
     } catch (err: any) {
-      messageApi.error(err.message || 'Възникна грешка при понижаването на потребителя.');
+      messageApi.error(err.message || t('admin.error_downgrade'));
     }
   };
 
   const columns = [
     {
-      title: 'Потребител',
+      title: t('admin.col_user'),
       key: 'user',
       render: (_: any, record: AppUser) => (
         <Space size="middle">
@@ -70,14 +72,14 @@ const AdminUsers: React.FC = () => {
       ),
     },
     {
-      title: 'Роля',
+      title: t('admin.col_role'),
       key: 'role',
       render: (_: any, record: AppUser) => (
         <Tag color="orange">{record.roleName}</Tag>
       ),
     },
     {
-      title: 'Действия',
+      title: t('admin.col_actions'),
       key: 'actions',
       align: 'right' as const,
       render: (_: any, record: AppUser) => (
@@ -86,7 +88,7 @@ const AdminUsers: React.FC = () => {
           icon={<CloseCircleOutlined />}
           onClick={() => showDowngradeModal(record)}
         >
-          Премахни права
+          {t('admin.remove_rights')}
         </Button>
       ),
     },
@@ -100,7 +102,7 @@ const AdminUsers: React.FC = () => {
         <Link to={routes.home}>
           <Button icon={<ArrowLeftOutlined />} shape="circle" />
         </Link>
-        <Title level={2} style={{ margin: 0, color: 'var(--text-primary)', fontSize: 'clamp(1.2rem, 5vw, 1.8rem)' }}>Управление на потребители</Title>
+        <Title level={2} style={{ margin: 0, color: 'var(--text-primary)', fontSize: 'clamp(1.2rem, 5vw, 1.8rem)' }}>{t('admin.users_title')}</Title>
       </div>
 
       <Card 
@@ -112,7 +114,7 @@ const AdminUsers: React.FC = () => {
         }}
       >
         <div style={{ marginBottom: '24px' }}>
-          <Text type="secondary">Тук можете да управлявате правата на потребителите с роля "Специален потребител".</Text>
+          <Text type="secondary">{t('admin.users_subtitle')}</Text>
         </div>
 
         <Table 
@@ -121,7 +123,7 @@ const AdminUsers: React.FC = () => {
           rowKey="id"
           pagination={false}
           scroll={{ x: 'max-content' }}
-          locale={{ emptyText: 'Няма специални потребители за управление.' }}
+          locale={{ emptyText: t('admin.empty_users') }}
         />
       </Card>
 
@@ -129,15 +131,15 @@ const AdminUsers: React.FC = () => {
         title={
           <Space>
             <WarningOutlined style={{ color: '#ff4d4f' }} />
-            <span>Потвърдете понижаването на роля</span>
+            <span>{t('admin.downgrade_modal_title')}</span>
           </Space>
         }
         open={isModalVisible}
         onOk={handleConfirm}
         onCancel={handleCancel}
         confirmLoading={isDowngrading}
-        okText="Потвърди понижаването"
-        cancelText="Отказ"
+        okText={t('admin.downgrade_confirm_btn')}
+        cancelText={t('admin.cancel')}
         okButtonProps={{ 
           danger: true, 
           disabled: !selectedUser || confirmEmail.toLowerCase() !== selectedUser.email.toLowerCase() 
@@ -145,19 +147,19 @@ const AdminUsers: React.FC = () => {
       >
         <div style={{ marginTop: '16px' }}>
           <Alert
-            message="Внимание: Тази операция е необратима през този интерфейс."
-            description="Потребителят ще загуби правата си да създава и управлява събития веднага."
+            message={t('admin.downgrade_warning_title')}
+            description={t('admin.downgrade_warning_desc')}
             type="warning"
             showIcon
             style={{ marginBottom: '20px' }}
           />
           
           <Paragraph>
-            За да потвърдите, че искате да понижите <strong>{selectedUser?.name}</strong>, моля напишете неговия имейл (<strong>{selectedUser?.email}</strong>) по-долу:
+            {t('admin.downgrade_instruction', { name: selectedUser?.name, email: selectedUser?.email })}
           </Paragraph>
           
           <Input 
-            placeholder="Въведете имейл за потвърждение" 
+            placeholder={t('admin.confirm_email_placeholder')} 
             value={confirmEmail}
             onChange={(e) => setConfirmEmail(e.target.value)}
             onPressEnter={() => {
