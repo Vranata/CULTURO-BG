@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, message } from 'antd';
 import { ShareAltOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { EventItem } from '../entities/events/model';
 
 type ShareEventButtonProps = {
@@ -12,6 +13,7 @@ type ShareEventButtonProps = {
 const buildEventUrl = (eventId: string) => `${window.location.origin}/events/${eventId}`;
 
 const ShareEventButton: React.FC<ShareEventButtonProps> = ({ event, compact = false, iconOnly = false }) => {
+  const { t } = useTranslation();
   const handleClick = async () => {
     const eventUrl = buildEventUrl(event.id);
 
@@ -26,13 +28,13 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({ event, compact = fa
       }
 
       await navigator.clipboard.writeText(eventUrl);
-      message.success('Линкът към събитието беше копиран.');
+      message.success(t('share.success'));
     } catch {
       try {
         await navigator.clipboard.writeText(eventUrl);
-        message.success('Линкът към събитието беше копиран.');
+        message.success(t('share.success'));
       } catch {
-        message.error('Неуспешно споделяне на събитието.');
+        message.error(t('share.error'));
       }
     }
   };
@@ -44,8 +46,8 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({ event, compact = fa
       icon={<ShareAltOutlined />}
       onClick={() => void handleClick()}
       size={compact ? 'small' : 'middle'}
-      title="Сподели събитието"
-      aria-label="Сподели събитието"
+      title={t('share.title')}
+      aria-label={t('share.title')}
       style={{
         width: iconOnly ? (compact ? 34 : 38) : undefined,
         minWidth: iconOnly ? (compact ? 34 : 38) : (compact ? 126 : 144),
@@ -54,7 +56,7 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({ event, compact = fa
         borderRadius: iconOnly ? 999 : 12,
       }}
     >
-      {iconOnly ? null : 'Сподели'}
+      {iconOnly ? null : t('share.label')}
     </Button>
   );
 };

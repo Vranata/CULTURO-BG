@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowRightOutlined, CalendarOutlined, EnvironmentOutlined } from '@ant-design/icons';
 import { Button, Card, Space, Tag, Typography } from 'antd';
 import { Link } from 'atomic-router-react';
+import { useTranslation } from 'react-i18next';
 import { routes } from '../shared/routing';
 import type { EventItem } from '../entities/events/model';
 import EventLikeButton from './EventLikeButton';
@@ -16,6 +17,7 @@ type EventSpotlightCardProps = {
 };
 
 const EventSpotlightCard: React.FC<EventSpotlightCardProps> = ({ event, reasonTags = [] }) => {
+  const { t } = useTranslation();
   return (
     <Card
       className="event-spotlight-card"
@@ -31,7 +33,7 @@ const EventSpotlightCard: React.FC<EventSpotlightCardProps> = ({ event, reasonTa
       styles={{ body: { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--surface-bg)' } }}
     >
       <div style={{ marginBottom: '12px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        <Tag color="blue">{event.category}</Tag>
+        <Tag color="blue">{t(`categories.${event.categoryId}`, event.category)}</Tag>
         {reasonTags.map((reasonTag) => (
           <Tag key={reasonTag} color="gold">
             {reasonTag}
@@ -49,17 +51,17 @@ const EventSpotlightCard: React.FC<EventSpotlightCardProps> = ({ event, reasonTa
 
       <Space orientation="vertical" size={4} style={{ color: 'var(--text-secondary)', marginTop: 'auto' }}>
         <Space size="small" style={{ color: 'var(--text-secondary)' }}>
-          <EnvironmentOutlined /> {event.region}
+          <EnvironmentOutlined /> {t(`regions.${event.regionId}`, event.region)}
         </Space>
         <Space size="small" style={{ color: 'var(--text-secondary)' }}>
           <CalendarOutlined /> {event.date}
         </Space>
-        <span style={{ color: 'var(--text-secondary)' }}>Място: {event.place}</span>
+        <span style={{ color: 'var(--text-secondary)' }}>{t('common.place', { place: event.place })}</span>
       </Space>
 
       <Space wrap size={8} style={{ marginTop: '16px' }}>
         <Link to={routes.eventDetails} params={{ id: event.id }}>
-          <Button type="default" icon={<ArrowRightOutlined />}>Виж повече</Button>
+          <Button type="default" icon={<ArrowRightOutlined />}>{t('common.view_more')}</Button>
         </Link>
 
         <GoogleCalendarButton event={event} compact iconOnly />

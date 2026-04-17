@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from 'antd';
 import { GoogleOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { EventItem } from '../entities/events/model';
 import { buildGoogleCalendarUrl } from '../shared/googleCalendar';
 
@@ -11,6 +12,7 @@ type GoogleCalendarButtonProps = {
 };
 
 const GoogleCalendarButton: React.FC<GoogleCalendarButtonProps> = ({ event, compact = false, iconOnly = false }) => {
+  const { t } = useTranslation();
   const calendarUrl = buildGoogleCalendarUrl(event);
 
   return (
@@ -22,8 +24,8 @@ const GoogleCalendarButton: React.FC<GoogleCalendarButtonProps> = ({ event, comp
       target="_blank"
       rel="noreferrer"
       size={compact ? 'small' : 'middle'}
-      title="Добави в Google Calendar"
-      aria-label="Добави в Google Calendar"
+      title={t('calendar.title')}
+      aria-label={t('calendar.title')}
       style={{
         width: iconOnly ? (compact ? 34 : 38) : undefined,
         minWidth: iconOnly ? (compact ? 34 : 38) : (compact ? 126 : 144),
@@ -32,7 +34,7 @@ const GoogleCalendarButton: React.FC<GoogleCalendarButtonProps> = ({ event, comp
         borderRadius: iconOnly ? 999 : 12,
       }}
     >
-      {iconOnly ? null : 'Календар'}
+      {iconOnly ? null : t('calendar.label')}
     </Button>
   );
 };

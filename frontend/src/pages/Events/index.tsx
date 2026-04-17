@@ -46,13 +46,6 @@ const { Title, Paragraph } = Typography;
 
 type EventSortMode = 'newest' | 'nearest' | 'liked' | 'latest';
 
-  const { t } = useTranslation();
-  const sortModeLabels: Record<EventSortMode, string> = {
-    newest: t('events.sort_newest'),
-    nearest: t('events.sort_nearest'),
-    liked: t('events.sort_liked'),
-    latest: t('events.sort_latest'),
-  };
 
 const sortModeIcons: Record<EventSortMode, React.ReactNode> = {
   newest: <ClockCircleOutlined />,
@@ -159,6 +152,7 @@ type EventLikeCountRow = {
 };
 
 const Events: React.FC = () => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [hasRequested, setHasRequested] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -217,6 +211,23 @@ const Events: React.FC = () => {
     loadMore: eventsLoadMore,
     hasMore: $hasMoreEvents,
   });
+
+  const sortModeLabels: Record<EventSortMode, string> = {
+    newest: t('events.sort_newest'),
+    nearest: t('events.sort_nearest'),
+    liked: t('events.sort_liked'),
+    latest: t('events.sort_latest'),
+  };
+
+  const localizedRegions = useMemo(() => regions.map(reg => ({
+    ...reg,
+    label: t(`regions.${reg.value}`, reg.label)
+  })), [regions, t]);
+
+  const localizedCategories = useMemo(() => categories.map(cat => ({
+    ...cat,
+    label: t(`categories.${cat.value}`, cat.label)
+  })), [categories, t]);
 
   const currentUserId = user?.id ?? null;
   const canCreateEvent = isAdmin || isSpecialUser;
@@ -538,7 +549,7 @@ const Events: React.FC = () => {
                 value={selectedRegionId}
                 onChange={onRegionChange}
                 onClear={() => onRegionChange(null)}
-                options={regions}
+                options={localizedRegions}
               />
             </div>
 
@@ -548,7 +559,7 @@ const Events: React.FC = () => {
                 value={selectedCategoryId}
                 onChange={onCategoryChange}
                 onClear={() => onCategoryChange(null)}
-                options={categories}
+                options={localizedCategories}
               />
             </div>
 

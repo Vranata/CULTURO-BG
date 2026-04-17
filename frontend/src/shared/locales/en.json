@@ -74,6 +74,51 @@
     "like": "Like",
     "error_like": "Failed to like the event."
   },
+  "common": {
+    "error_unknown": "Unknown error.",
+    "cancel": "Cancel",
+    "send": "Send",
+    "place": "Place: {{place}}",
+    "view_more": "View more"
+  },
+  "share": {
+    "success": "Event link copied to clipboard.",
+    "error": "Failed to share the event.",
+    "label": "Share",
+    "title": "Share event"
+  },
+  "calendar": {
+    "label": "Calendar",
+    "title": "Add to Google Calendar"
+  },
+  "profile_settings": {
+    "title": "Profile and Settings",
+    "survey_title": "Welcome to CULTURO BG",
+    "email_password_note": "Email and password change options are only shown on request. Each change has its own confirmation button.",
+    "email_current": "Email: {{email}}",
+    "change_email_btn": "Change email",
+    "change_password_btn": "Change password",
+    "new_email_label": "New email address",
+    "new_email_placeholder": "new.email@example.com",
+    "password_reset_note": "We will send a password reset link to your email address.",
+    "send_reset_link": "Send link",
+    "preferred_categories": "Preferred categories",
+    "select_categories_placeholder": "Select categories",
+    "categories_hint": "Categories are optional. You can leave this field empty.",
+    "save_changes": "Save changes",
+    "start_btn": "Start",
+    "success_saved": "Changes saved successfully!",
+    "error_load": "Error loading profile.",
+    "error_save": "Error saving profile.",
+    "pwd_reset_success": "A password reset link has been sent to your email.",
+    "pwd_reset_error": "Error sending email.",
+    "email_change_prompt": "Please enter a new email address.",
+    "email_change_success": "Request sent. Please check your new email for confirmation.",
+    "email_change_error": "Error changing email.",
+    "name_label": "Name",
+    "name_placeholder": "Your name",
+    "name_required": "Please enter your name."
+  },
   "event_details": {
     "back": "Back to List",
     "about": "About the Event",

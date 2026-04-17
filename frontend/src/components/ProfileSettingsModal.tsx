@@ -1,14 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Form, Input, Modal, Select, Space, Typography, message } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { AppUser } from '../entities/model';
 import { refreshUserProfile } from '../entities/model';
 import { supabase } from '../services/supabaseClient';
 import { resetPassword, updateAccount } from '../shared/api/auth';
 import { fallbackCategoryOptions } from '../shared/profileCategoryOptions';
 import { setLocalOnboardingCompletion } from '../shared/profileOnboarding';
-
-const isMissingOnboardingColumnError = (error: { code?: string | null; message?: string | null }) =>
-  error.code === '42703' || error.code === 'PGRST204' || Boolean(error.message?.includes('profile_onboarding_completed'));
 
 const isValidationError = (error: unknown) => Boolean(error && typeof error === 'object' && 'errorFields' in error);
 
@@ -44,13 +42,21 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   onClose,
   onCompleted,
 }) => {
+  const { t } = useTranslation();
   const [form] = Form.useForm<ProfileSettingsValues>();
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingEmailChange, setIsSendingEmailChange] = useState(false);
   const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
   const [isEmailChangeVisible, setIsEmailChangeVisible] = useState(false);
   const [isPasswordChangeVisible, setIsPasswordChangeVisible] = useState(false);
-  const availableCategories = useMemo(() => (categoryOptions.length > 0 ? categoryOptions : fallbackCategoryOptions), [categoryOptions]);
+  
+  const localizedCategoryOptions = useMemo(() => {
+    const options = categoryOptions.length > 0 ? categoryOptions : fallbackCategoryOptions;
+    return options.map(opt => ({
+      ...opt,
+      label: t(`categories.${opt.value}`, opt.label)
+    }));
+  }, [categoryOptions, t]);
 
   const resolveCurrentUserDbId = async (retries = 2): Promise<number | null> => {
     const { data, error } = await supabase
@@ -67,7 +73,6 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       return resolveCurrentUserDbId(retries - 1);
     }
 
-    // 1. Check if user already exists to avoid resetting their role
     const { data: existingUser } = await supabase
       .from('users')
       .select('id_user, id_category')
@@ -81,7 +86,6 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       password_hash: 'supabase_auth_managed_placeholder',
     };
 
-    // Only set default role and region for BRAND NEW users
     if (!existingUser) {
       payload.id_category = 1;
       payload.id_region = 0;
@@ -102,7 +106,6 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
     if (!open) return;
 
     const loadProfilePreferences = async () => {
-      // Small delay to ensure the form is fully connected
       await new Promise((resolve) => setTimeout(resolve, 100));
       const currentUserDbId = await resolveCurrentUserDbId();
 
@@ -127,19 +130,17 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
         email: user.email,
         categoryIds: selectedCategoryIds,
       });
-      console.log('[Preferences] User preferences loaded.');
     };
 
-    void loadProfilePreferences().catch((error) => {
-      console.error('[Preferences] Error:', error);
-      message.error('Грешка при зареждане на профила.');
+    void loadProfilePreferences().catch(() => {
+      message.error(t('profile_settings.error_load'));
     });
 
     setIsEmailChangeVisible(false);
     setIsPasswordChangeVisible(false);
     setIsSendingEmailChange(false);
     setIsSendingPasswordReset(false);
-  }, [form, open, user.email, user.id, user.name, availableCategories]);
+  }, [form, open, user.email, user.authUserId, user.name, t]);
 
   const persistCategoryPreferences = async (categoryIds: string[]) => {
     const currentUserDbId = await resolveCurrentUserDbId();
@@ -159,15 +160,11 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   const handleSave = async (values: ProfileSettingsValues) => {
     setIsSaving(true);
     try {
-      // 1. Persist categories
       await persistCategoryPreferences(values.categoryIds);
 
-      // 2. Update basic info (name/email if needed)
       if (values.name !== user.name) {
-        // Update Auth Metadata (for fallback)
         await updateAccount({ data: { full_name: values.name } });
         
-        // Update Users Table (source of truth for the app)
         const currentUserDbId = await resolveCurrentUserDbId();
         if (currentUserDbId) {
           const { error: dbError } = await supabase
@@ -178,7 +175,6 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
         }
       }
 
-      // 3. Mark onboarding as completed if in survey mode
       if (mode === 'survey') {
         const currentUserDbId = await resolveCurrentUserDbId();
         if (currentUserDbId) {
@@ -187,13 +183,12 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
         }
       }
 
-      message.success('Промените са запазени успешно!');
+      message.success(t('profile_settings.success_saved'));
       refreshUserProfile();
       onCompleted();
     } catch (error: any) {
       if (!isValidationError(error)) {
-        console.error('Save error:', error);
-        message.error(error.message || 'Грешка при записване.');
+        message.error(error.message || t('profile_settings.error_save'));
       }
     } finally {
       setIsSaving(false);
@@ -204,11 +199,10 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
     setIsSendingPasswordReset(true);
     try {
       await resetPassword({ email: user.email, redirectTo: window.location.origin });
-      message.success('Линк за нулиране на паролата е изпратен на вашия имейл.');
+      message.success(t('profile_settings.pwd_reset_success'));
       setIsPasswordChangeVisible(false);
     } catch (error: any) {
-      console.error('Password reset error:', error);
-      message.error(error.message || 'Грешка при изпращане на имейл.');
+      message.error(error.message || t('profile_settings.pwd_reset_error'));
     } finally {
       setIsSendingPasswordReset(false);
     }
@@ -217,18 +211,17 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   const handleEmailChangeRequest = async () => {
     const newEmail = form.getFieldValue('email');
     if (!newEmail || newEmail === user.email) {
-      message.warning('Моля въведете нов имейл адрес.');
+      message.warning(t('profile_settings.email_change_prompt'));
       return;
     }
 
     setIsSendingEmailChange(true);
     try {
       await updateAccount({ email: newEmail });
-      message.success('Заявката е изпратена. Моля проверете новия си имейл за потвърждение.');
+      message.success(t('profile_settings.email_change_success'));
       setIsEmailChangeVisible(false);
     } catch (error: any) {
-      console.error('Email change error:', error);
-      message.error(error.message || 'Грешка при промяна на имейла.');
+      message.error(error.message || t('profile_settings.email_change_error'));
     } finally {
       setIsSendingEmailChange(false);
     }
@@ -236,7 +229,7 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
 
   return (
     <Modal
-      title={mode === 'survey' ? 'Добре дошли в CULTURO BG' : 'Профил и настройки'}
+      title={mode === 'survey' ? t('profile_settings.survey_title') : t('profile_settings.title')}
       open={open}
       onCancel={onClose}
       footer={null}
@@ -245,67 +238,67 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
     >
       <div style={{ padding: '10px 0' }}>
         <Typography.Paragraph type="secondary">
-          Имейлът и паролата се отварят само при изрично желание. Всяка промяна има свой отделен бутон за потвърждение.
+          {t('profile_settings.email_password_note')}
         </Typography.Paragraph>
 
         <Form form={form} layout="vertical" onFinish={handleSave} initialValues={{ name: user.name, email: user.email }}>
-          <Form.Item name="name" label="Име" rules={[{ required: true, message: 'Моля въведете име.' }]}>
-            <Input placeholder="Вашето име" />
+          <Form.Item name="name" label={t('profile_settings.name_label')} rules={[{ required: true, message: t('profile_settings.name_required') }]}>
+            <Input placeholder={t('profile_settings.name_placeholder')} />
           </Form.Item>
 
           {isEmailChangeVisible ? (
-            <Form.Item label="Нов имейл адрес" style={{ marginBottom: 24 }}>
+            <Form.Item label={t('profile_settings.new_email_label')} style={{ marginBottom: 24 }}>
               <Space.Compact style={{ width: '100%' }}>
-                <Form.Item name="email" noStyle rules={[{ required: true, type: 'email', message: 'Моля въведете валиден имейл.' }]}>
-                  <Input placeholder="нов.имейл@example.com" />
+                <Form.Item name="email" noStyle rules={[{ required: true, type: 'email', message: t('auth.email_invalid') }]}>
+                  <Input placeholder={t('profile_settings.new_email_placeholder')} />
                 </Form.Item>
                 <Button type="primary" onClick={handleEmailChangeRequest} loading={isSendingEmailChange}>
-                  Потвърди
+                  {t('common.send')}
                 </Button>
-                <Button onClick={() => setIsEmailChangeVisible(false)}>Отказ</Button>
+                <Button onClick={() => setIsEmailChangeVisible(false)}>{t('common.cancel')}</Button>
               </Space.Compact>
             </Form.Item>
           ) : (
             <div style={{ marginBottom: 24 }}>
               <Button type="dashed" block onClick={() => setIsEmailChangeVisible(true)}>
-                Смени имейла
+                {t('profile_settings.change_email_btn')}
               </Button>
               <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
-                Имейл: {user.email}
+                {t('profile_settings.email_current', { email: user.email })}
               </Typography.Text>
             </div>
           )}
 
           {isPasswordChangeVisible ? (
             <div style={{ marginBottom: 24, padding: '12px', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-              <Typography.Paragraph>Ще ви изпратим линк за нулиране на паролата на вашия имейл адрес.</Typography.Paragraph>
+              <Typography.Paragraph>{t('profile_settings.password_reset_note')}</Typography.Paragraph>
               <Space>
                 <Button type="primary" onClick={handlePasswordReset} loading={isSendingPasswordReset}>
-                  Изпрати линк
+                  {t('profile_settings.send_reset_link')}
                 </Button>
-                <Button onClick={() => setIsPasswordChangeVisible(false)}>Отказ</Button>
+                <Button onClick={() => setIsPasswordChangeVisible(false)}>{t('common.cancel')}</Button>
               </Space>
             </div>
           ) : (
             <div style={{ marginBottom: 24 }}>
               <Button type="dashed" block onClick={() => setIsPasswordChangeVisible(true)}>
-                Смени паролата
+                {t('profile_settings.change_password_btn')}
               </Button>
             </div>
           )}
 
-          <Form.Item name="categoryIds" label="Предпочитани категории">
-            <Select mode="multiple" placeholder="Изберете категории" style={{ width: '100%' }} options={availableCategories} />
+          <Form.Item name="categoryIds" label={t('profile_settings.preferred_categories')}>
+            <Select mode="multiple" placeholder={t('profile_settings.select_categories_placeholder')} style={{ width: '100%' }} options={localizedCategoryOptions} />
           </Form.Item>
           <Typography.Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '24px' }}>
-            Категориите не са задължителни. Можеш да оставиш полето празно.
+            {t('profile_settings.categories_hint')}
           </Typography.Text>
 
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
-              <Button onClick={onClose}>Отказ</Button>
+              <Button onClick={onClose}>{t('common.cancel')}</Button>
               <Button type="primary" htmlType="submit" loading={isSaving}>
-                {mode === 'survey' ? 'Започни' : 'Запази промените'}
+                {mode === 'survey' ? t('profile_settings.start_btn') : t('profile_settings.save_changes')}
               </Button>
             </Space>
           </Form.Item>
