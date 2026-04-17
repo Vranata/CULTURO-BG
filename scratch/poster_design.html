@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Culturo BG Poster Design</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FF6B00;
+            --secondary: #4F46E5;
+            --bg: #0A0A0B;
+            --text: #ffffff;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 40px;
+        }
+
+        .poster {
+            width: 842px; /* A3 width at 72dpi is approx, using proportional scale */
+            height: 1191px;
+            background: var(--bg);
+            background-image: url('file:///C:/Users/nikik/.gemini/antigravity/brain/fa317638-02fe-44bb-b7f0-b62057b25c5e/final_poster_background_v3_1776418146366.png');
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            color: var(--text);
+            overflow: hidden;
+            box-shadow: 0 50px 100px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            padding: 80px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .logo-mark {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 32px;
+            font-family: 'Outfit', sans-serif;
+            box-shadow: 0 10px 20px rgba(255, 107, 0, 0.3);
+        }
+
+        .brand-name {
+            font-family: 'Outfit', sans-serif;
+            font-size: 54px;
+            font-weight: 900;
+            letter-spacing: -2px;
+            background: linear-gradient(to bottom, #fff, #bbb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .slogan {
+            font-family: 'Outfit', sans-serif;
+            font-size: 28px;
+            text-align: center;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: auto;
+            font-weight: 700;
+            text-shadow: 0 0 30px rgba(255,107,0,0.5);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            margin-bottom: 80px;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            padding: 40px;
+            border-radius: 40px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 25px;
+        }
+
+        .feature-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            color: var(--primary);
+            font-size: 24px;
+            border: 1px solid rgba(255,107,0,0.3);
+        }
+
+        .feature-text h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .feature-text p {
+            font-size: 18px;
+            color: rgba(255,255,255,0.7);
+            line-height: 1.4;
+        }
+
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .qr-section {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .qr-placeholder {
+            width: 140px;
+            height: 140px;
+            background: #fff;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+        }
+
+        .qr-placeholder svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .cta-text {
+            font-size: 20px;
+            max-width: 250px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .tech-tags {
+            display: flex;
+            gap: 15px;
+            opacity: 0.5;
+        }
+
+        .tech-tag {
+            font-size: 14px;
+            padding: 5px 15px;
+            border: 1px solid #fff;
+            border-radius: 20px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="poster">
+        <div class="header">
+            <div class="logo-mark">C</div>
+            <h1 class="brand-name">CULTURO BG</h1>
+        </div>
+
+        <h2 class="slogan">Твоят град. Твоите събития. Твоят Culturo BG.</h2>
+
+        <div class="features-grid">
+            <div class="feature-item">
+                <div class="feature-icon">★</div>
+                <div class="feature-text">
+                    <h3>Интелигентна Персонализация</h3>
+                    <p>Твоите интереси са на първо място. Платформата "научава" какво харесваш и те подсеща навреме.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">📍</div>
+                <div class="feature-text">
+                    <h3>Национален Обхват</h3>
+                    <p>Открий културния живот навсякъде в България – от най-големия фестивал до най-малката изложба.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">⚡</div>
+                <div class="feature-text">
+                    <h3>Смарт Интеграция</h3>
+                    <p>Синхронизация с Google Calendar за твоите любими събития и постоянно ново съдържание чрез уеб скрапинг.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="qr-section">
+                <div class="qr-placeholder">
+                    <!-- Conceptual QR Code -->
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M0 0h30v10H10v20H0V0zm40 0h20v10H40V0zm30 0h30v30H90V10H70V0zM0 40h10v20H0V40zm40 40h20v10H40V40zm50 0h10v20H90V40zM0 70h30v30H0V70zm10 10v10h10V80H10zm60 0h30v10H70V80zm20 10v10h10V90H90z" fill="#000"/>
+                        <rect x="35" y="35" width="30" height="30" rx="5" fill="#FF6B00"/>
+                    </svg>
+                </div>
+                <div class="cta-text">Сканирай и открий културата около теб още днес!</div>
+            </div>
+            <div class="tech-tags">
+                <span class="tech-tag">React</span>
+                <span class="tech-tag">Supabase</span>
+                <span class="tech-tag">Python</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
