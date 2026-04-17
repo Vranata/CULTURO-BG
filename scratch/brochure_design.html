@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Culturo BG A5 Brochure</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FF6B00;
+            --secondary: #4F46E5;
+            --bg: #0A0A0B;
+            --text: #ffffff;
+            --muted: rgba(255, 255, 255, 0.6);
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @page {
+            size: A5;
+            margin: 0;
+        }
+
+        body {
+            background-color: #333;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+            padding: 40px;
+        }
+
+        .page {
+            width: 148mm;
+            height: 210mm;
+            background: var(--bg);
+            color: var(--text);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 20mm;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            page-break-after: always;
+        }
+
+        /* Cover Page */
+        .page-cover {
+            background-image: linear-gradient(to bottom, rgba(10,10,11,0.2), rgba(10,10,11,1)), 
+                              url('file:///C:/Users/nikik/.gemini/antigravity/brain/fa317638-02fe-44bb-b7f0-b62057b25c5e/final_poster_background_v3_1776418146366.png');
+            background-size: cover;
+            background-position: center;
+            justify-content: flex-end;
+            text-align: center;
+        }
+
+        .cover-content h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 32pt;
+            font-weight: 900;
+            margin-bottom: 5mm;
+            letter-spacing: -1pt;
+        }
+
+        .cover-content p {
+            font-size: 14pt;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 2pt;
+            font-weight: 700;
+        }
+
+        .student-name {
+            margin-top: 20mm;
+            font-size: 10pt;
+            opacity: 0.7;
+        }
+
+        /* Interior Pages */
+        .page-header {
+            font-family: 'Outfit', sans-serif;
+            font-size: 20pt;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 10mm;
+            border-bottom: 1px solid var(--glass);
+            padding-bottom: 3mm;
+        }
+
+        .content-text {
+            font-size: 11pt;
+            line-height: 1.6;
+            color: var(--muted);
+        }
+
+        .content-text strong {
+            color: #fff;
+        }
+
+        .illustrative-image {
+            width: 100%;
+            height: 50mm;
+            background-size: cover;
+            background-position: center;
+            border-radius: 10mm;
+            margin: 10mm 0;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Features List */
+        .feature {
+            margin-bottom: 6mm;
+        }
+
+        .feature h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 12pt;
+            color: #fff;
+            margin-bottom: 1mm;
+            display: flex;
+            align-items: center;
+            gap: 2mm;
+        }
+
+        .feature h3::before {
+            content: '→';
+            color: var(--primary);
+        }
+
+        /* Back Cover */
+        .page-back {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .qr-placeholder {
+            width: 40mm;
+            height: 40mm;
+            background: #fff;
+            padding: 5mm;
+            border-radius: 5mm;
+            margin-bottom: 10mm;
+        }
+
+        .qr-placeholder svg { width: 100%; height: 100%; }
+
+        @media print {
+            body { padding: 0; background: none; }
+            .page { box-shadow: none; border: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Page 1: Cover -->
+    <div class="page page-cover">
+        <div class="cover-content">
+            <h1>CULTURO BG</h1>
+            <p>Дигиталният мост към културата</p>
+            <div class="student-name">Дипломна работа на Николай Килифарев</div>
+        </div>
+    </div>
+
+    <!-- Page 2: The Problem -->
+    <div class="page">
+        <h2 class="page-header">Информационен шум</h2>
+        <div class="content-text">
+            <p>В съвременната дигитална ера откриването на качествени събития е парадоксално трудно. Данните са фрагментирани между десетки социални мрежи, общински страници и частни календари.</p>
+            <p style="margin-top: 5mm;"><strong>Culturo BG</strong> адресира липсата на централизирана и интелигентна точка за достъп до културния живот в България.</p>
+        </div>
+        <div class="illustrative-image" style="background-image: url('file:///C:/Users/nikik/.gemini/antigravity/brain/fa317638-02fe-44bb-b7f0-b62057b25c5e/poster_style_2_vibrant_1776418141014.png'); opacity: 0.5;"></div>
+    </div>
+
+    <!-- Page 3: Smart Features -->
+    <div class="page">
+        <h2 class="page-header">Интелигентни решения</h2>
+        <div class="feature">
+            <h3>Персонализация</h3>
+            <p class="content-text">Твоите интереси са <strong>на първо място</strong>. Платформата научава предпочитанията ти и предлага събития, които наистина ще харесаш.</p>
+        </div>
+        <div class="feature">
+            <h3>Национален обхват</h3>
+            <p class="content-text">Откривай културата <strong>навсякъде</strong> в България. От София до най-малките населени места – регионалното разнообразие е наш приоритет.</p>
+        </div>
+        <div class="feature">
+            <h3>Постоянно съдържание</h3>
+            <p class="content-text">Автоматизираното събиране на данни (web scraping) гарантира <strong>постоянно ново съдържание</strong> без нужда от ръчна намеса.</p>
+        </div>
+    </div>
+
+    <!-- Page 4: Architecture -->
+    <div class="page">
+        <h2 class="page-header">Технологична мощ</h2>
+        <div class="illustrative-image" style="height: 70mm; background-image: url('file:///C:/Users/nikik/.gemini/antigravity/brain/fa317638-02fe-44bb-b7f0-b62057b25c5e/brochure_architecture_visual_1776418806198.png');"></div>
+        <div class="content-text">
+            <p>Проектът използва модерния <strong>React + TypeScript</strong> за фронтенд и <strong>Supabase (PostgreSQL)</strong> за бекенд. Автоматизацията се движи от мощни <strong>Python</strong> скриптове за скрапинг.</p>
+        </div>
+    </div>
+
+    <!-- Page 5: Roles & Security -->
+    <div class="page">
+        <h2 class="page-header">Сигурност и Управление</h2>
+        <div class="illustrative-image" style="height: 70mm; background-image: url('file:///C:/Users/nikik/.gemini/antigravity/brain/fa317638-02fe-44bb-b7f0-b62057b25c5e/brochure_security_visual_1776418921530.png');"></div>
+        <div class="content-text">
+            <p>Йерархична система от 4 нива (Потребител, Модератор, Администратор) осигурява пълен контрол и защита на данните чрез Row Level Security (RLS) политики.</p>
+        </div>
+    </div>
+
+    <!-- Page 6: Back Cover -->
+    <div class="page page-back">
+        <div class="qr-placeholder">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 0h30v10H10v20H0V0zm40 0h20v10H40V0zm30 0h30v30H90V10H70V0zM0 40h10v20H0V40zm40 40h20v10H40V40zm50 0h10v20H90V40zM0 70h30v30H0V70zm10 10v10h10V80H10zm60 0h30v10H70V80zm20 10v10h10V90H90z" fill="#000"/>
+                <rect x="35" y="35" width="30" height="30" rx="5" fill="#FF6B00"/>
+            </svg>
+        </div>
+        <h2 style="font-family: 'Outfit'; margin-bottom: 5mm;">Тествай на живо</h2>
+        <p class="content-text" style="max-width: 80mm;">Сканирай кода и се потопи в света на българската култура.</p>
+        <div class="student-name" style="margin-top: 30mm;">© 2026 Culturo BG Project</div>
+    </div>
+
+</body>
+</html>
