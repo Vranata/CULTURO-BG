@@ -1,3 +1,4 @@
+import i18n from './i18n';
 import { findBulgarianRegionByText } from './bulgarianRegions';
 
 export type BrowserCoordinates = {
@@ -44,7 +45,7 @@ const buildReverseGeocodeUrl = ({ latitude, longitude }: BrowserCoordinates) => 
 
 const getBrowserCoordinates = (): Promise<BrowserCoordinates> => new Promise((resolve, reject) => {
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
-    reject(new Error('Геолокацията не се поддържа от този браузър.'));
+    reject(new Error(i18n.t('location.error_not_supported')));
     return;
   }
 

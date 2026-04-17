@@ -285,7 +285,7 @@ const App: React.FC = () => {
                 }}
               />
             </Tooltip>
-            <Tooltip title={i18n.language.startsWith('en') ? 'Български' : 'English'}>
+            <Tooltip title={t('common.switch_lang')}>
               <Button
                 shape="circle"
                 type="text"
@@ -414,7 +414,7 @@ const App: React.FC = () => {
                 onClick={toggleLanguage}
                 style={{ borderRadius: '12px', background: 'var(--toggle-bg)', color: 'var(--toggle-fg)', border: '1px solid var(--toggle-border)', marginTop: -8 }}
               >
-                {i18n.language.startsWith('en') ? 'Български' : 'English'}
+                {t('common.switch_lang')}
               </Button>
             </div>
           </div>

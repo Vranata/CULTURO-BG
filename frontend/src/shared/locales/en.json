@@ -79,7 +79,15 @@
     "cancel": "Cancel",
     "send": "Send",
     "place": "Place: {{place}}",
-    "view_more": "View more"
+    "view_more": "View more",
+    "switch_lang": "Български"
+  },
+  "location": {
+    "success_detected": "Location detected: {{region}}",
+    "info_no_region": "Location is outside supported regions.",
+    "warning_declined": "Location access was denied.",
+    "error_detection": "Error detecting location.",
+    "error_not_supported": "Geolocation is not supported by this browser."
   },
   "share": {
     "success": "Event link copied to clipboard.",
